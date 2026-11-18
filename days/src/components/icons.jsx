@@ -26,3 +26,5 @@ export const Video = (p) => <S {...p}><path d="M23 7l-7 5 7 5V7z" /><rect x="1" 
 export const TextNote = (p) => <S {...p}><path d="M4 6h16M4 12h16M4 18h10" /></S>
 export const Scribble = (p) => <S {...p}><path d="M3 17c3-6 5-9 7-9s-1 8 2 8 3-6 5-6 1 5 4 5" /></S>
 export const Undo = (p) => <S {...p}><path d="M9 14L4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 0 10h-3" /></S>
+export const Lock = (p) => <S {...p}><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></S>
+export const Globe = (p) => <S {...p}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" /></S>

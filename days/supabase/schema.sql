@@ -50,11 +50,13 @@ create table if not exists public.captures (
   place_name      text,
   comment         text,
   voice_note_url  text,
+  is_public       boolean not null default false, -- photos/videos are saved public, notes private
   imported        boolean not null default false,
   created_at      timestamptz not null default now()
 );
 -- Keeps older copies of this table up to date when the file is run again.
 alter table public.captures add column if not exists body text;
+alter table public.captures add column if not exists is_public boolean not null default false;
 alter table public.captures drop constraint if exists captures_type_check;
 alter table public.captures add constraint captures_type_check check (type in ('photo', 'video', 'audio', 'text', 'drawing'));
 alter table public.profiles drop constraint if exists profiles_theme_check;
@@ -109,7 +111,8 @@ drop policy if exists "edit own profile" on public.profiles;
 create policy "edit own profile" on public.profiles for update to authenticated using (id = auth.uid());
 
 drop policy if exists "captures readable" on public.captures;
-create policy "captures readable" on public.captures for select to authenticated using (true);
+-- Private captures are only ever sent to their owner.
+create policy "captures readable" on public.captures for select to authenticated using (is_public or user_id = auth.uid());
 drop policy if exists "add own captures" on public.captures;
 create policy "add own captures" on public.captures for insert to authenticated with check (user_id = auth.uid());
 drop policy if exists "edit own captures" on public.captures;
@@ -118,7 +121,8 @@ drop policy if exists "delete own captures" on public.captures;
 create policy "delete own captures" on public.captures for delete to authenticated using (user_id = auth.uid());
 
 drop policy if exists "tags readable" on public.tags;
-create policy "tags readable" on public.tags for select to authenticated using (true);
+create policy "tags readable" on public.tags for select to authenticated
+  using (exists (select 1 from public.captures c where c.id = capture_id and (c.is_public or c.user_id = auth.uid())));
 drop policy if exists "tag on own captures" on public.tags;
 create policy "tag on own captures" on public.tags for all to authenticated
   using (exists (select 1 from public.captures c where c.id = capture_id and c.user_id = auth.uid()))

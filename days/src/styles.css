@@ -431,3 +431,20 @@ video.mirror { transform: scaleX(-1); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
 }
+
+/* ---------- Privacy ---------- */
+.privacy { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--line); border-radius: var(--r-sm); padding: 3px; background: var(--surface); }
+.privacy button { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 2px; color: var(--muted); text-align: left; transition: all 0.3s var(--ease); }
+.privacy button span { display: grid; line-height: 1.15; }
+.privacy button b { font-weight: 500; font-size: 15px; }
+.privacy button small { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.75; }
+.privacy button.on { background: var(--solid); color: var(--on-solid); }
+.privacy-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border-radius: var(--r-sm);
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: #fff;
+  background: rgba(17, 17, 17, 0.42); border: 1px solid rgba(255, 255, 255, 0.35); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.privacy-chip.private { background: var(--solid); color: var(--on-solid); border-color: var(--solid); }
+.paper-bg .privacy-chip.public, .type-drawing .privacy-chip.public { background: var(--surface); color: var(--ink); border-color: var(--line); }
+.lock-badge { position: absolute; top: 6px; right: 6px; z-index: 1; width: 20px; height: 20px; border-radius: 999px; display: grid; place-items: center; background: var(--solid); color: var(--on-solid); }
+.card .face-text, .spread-item .face-text { padding-right: 28px; }

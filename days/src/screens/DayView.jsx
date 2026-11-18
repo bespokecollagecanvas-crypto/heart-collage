@@ -4,6 +4,8 @@ import Shell from '../components/Shell'
 import MetaOverlay from '../components/MetaOverlay'
 import { VoicePlayer } from '../components/Voice'
 import CaptureFace, { TypeIcon } from '../components/CaptureFace'
+import { PrivacyChip } from '../components/Privacy'
+import { Lock } from '../components/icons'
 import { Back, Close, Next, Trash } from '../components/icons'
 import { useApp, useCaptures, useProfile } from '../lib/store'
 import { api } from '../lib/api'
@@ -53,6 +55,16 @@ export default function DayView() {
     }
   }
 
+  async function togglePrivacy(c) {
+    try {
+      await api.captures.update(c.id, { is_public: !c.is_public })
+      setToast(c.is_public ? 'Now private: only you can see it' : 'Now public: shown on your profile')
+      bump()
+    } catch (e) {
+      setToast(e.message)
+    }
+  }
+
   const places = [...new Set(captures.map((c) => c.place_name).filter(Boolean))]
   const isToday = day === dayKey()
   const future = day > dayKey()
@@ -89,11 +101,11 @@ export default function DayView() {
             {mine && isToday && <button className="btn primary" onClick={() => nav('/')}>Capture something</button>}
           </div>
         ) : full ? (
-          <FullView captures={captures} index={index} setIndex={setIndex} onClose={() => setFull(false)} onDelete={mine ? remove : null} />
+          <FullView captures={captures} index={index} setIndex={setIndex} onClose={() => setFull(false)} onDelete={mine ? remove : null} onPrivacy={mine ? togglePrivacy : null} />
         ) : expanded ? (
           <Spread captures={captures} index={index} onPick={(i) => { setIndex(i); setExpanded(false) }} />
         ) : (
-          <FannedStack captures={captures} index={index} setIndex={setIndex} onTap={() => setExpanded(true)} onDoubleTap={() => setFull(true)} />
+          <FannedStack captures={captures} index={index} setIndex={setIndex} onTap={() => setExpanded(true)} onDoubleTap={() => setFull(true)} mine={mine} />
         )}
 
         {!full && captures.length > 0 && (
@@ -133,7 +145,7 @@ function stackLayout(n, w, h) {
   })
 }
 
-function FannedStack({ captures, index, setIndex, onTap, onDoubleTap }) {
+function FannedStack({ captures, index, setIndex, onTap, onDoubleTap, mine }) {
   const ref = useRef()
   const [size, setSize] = useState(null)
   const [drag, setDrag] = useState(0)
@@ -207,6 +219,7 @@ function FannedStack({ captures, index, setIndex, onTap, onDoubleTap }) {
               }}
             >
               <CaptureFace c={c} live={front} />
+              {mine && !c.is_public && <span className="lock-badge" aria-label="Private"><Lock size={11} /></span>}
               {c.voice_note_url && c.type !== 'audio' && <span className="card-badge"><TypeIcon type="audio" size={12} /></span>}
             </div>
           )
@@ -245,6 +258,7 @@ function Spread({ captures, index, onPick }) {
       {captures.map((c, i) => (
         <button key={c.id} className={`spread-item type-${c.type} ${i === index ? 'on' : ''}`} style={{ '--i': i }} onClick={() => onPick(i)}>
           <CaptureFace c={c} />
+          {!c.is_public && <span className="lock-badge"><Lock size={10} /></span>}
           <span className="pill"><TypeIcon type={c.type} size={11} />{clock(new Date(c.taken_at))}</span>
         </button>
       ))}
@@ -254,7 +268,7 @@ function Spread({ captures, index, onPick }) {
 
 /* ---------- Double tap: full screen ---------- */
 
-function FullView({ captures, index, setIndex, onClose, onDelete }) {
+function FullView({ captures, index, setIndex, onClose, onDelete, onPrivacy }) {
   const c = captures[index] || captures[0]
   const [armed, setArmed] = useState(false)
   useEffect(() => {
@@ -290,7 +304,10 @@ function FullView({ captures, index, setIndex, onClose, onDelete }) {
         </div>
       )}
       <div className="full-top">
-        <span className="count-chip"><TypeIcon type={c.type} size={12} /> {index + 1} / {n}</span>
+        <div className="row">
+          <span className="count-chip"><TypeIcon type={c.type} size={12} /> {index + 1} / {n}</span>
+          {onPrivacy && <PrivacyChip isPublic={!!c.is_public} onToggle={() => onPrivacy(c)} />}
+        </div>
         <div className="row">
           {onDelete && (
             <button className={`icon-btn glass ${armed ? 'armed' : ''}`} onClick={(e) => { e.stopPropagation(); armed ? onDelete(c) : setArmed(true) }} aria-label={armed ? 'Tap again to delete' : 'Delete'}>

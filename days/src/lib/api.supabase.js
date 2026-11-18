@@ -66,7 +66,7 @@ export function createSupabaseApi(url, key) {
       },
     },
     captures: {
-      async create({ file, thumb, type, takenAt, day, lat, lng, placeName, comment, voiceNote, body }) {
+      async create({ file, thumb, type, takenAt, day, lat, lng, placeName, comment, voiceNote, body, isPublic }) {
         const id = crypto.randomUUID()
         const user = await uid()
         const media_url = file ? await upload(`${user}/${id}.${extFor(file.type)}`, file) : null
@@ -76,7 +76,7 @@ export function createSupabaseApi(url, key) {
           id, user_id: user, type, media_url, thumb_url, voice_note_url,
           taken_at: takenAt.toISOString(), day,
           latitude: lat, longitude: lng, place_name: placeName,
-          comment: comment || null, body: body || null, imported: false,
+          comment: comment || null, body: body || null, is_public: isPublic ?? (type === 'photo' || type === 'video'), imported: false,
         }
         const res = await sb.from('captures').insert(row).select().single()
         if (res.error) {

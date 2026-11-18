@@ -6,6 +6,7 @@ import { VoicePlayer, VoiceRecorder } from '../components/Voice'
 import NoteComposer from '../components/NoteComposer'
 import VoiceCapture from '../components/VoiceCapture'
 import CaptureFace from '../components/CaptureFace'
+import { PrivacySwitch, defaultPublic } from '../components/Privacy'
 import { Flame, Flip, Gear, Image } from '../components/icons'
 import { useApp } from '../lib/store'
 import { api } from '../lib/api'
@@ -208,18 +209,18 @@ export default function Today() {
     setPending({ file: f, thumb, type: video ? 'video' : 'photo', takenAt: new Date(), url: URL.createObjectURL(f), loc })
   }
 
-  async function save({ comment, voiceNote }) {
+  async function save({ comment, voiceNote, isPublic }) {
     const p = pending
     const l = p.loc?.lat ? p.loc : loc
     await api.captures.create({
       file: p.file, thumb: p.thumb, type: p.type, body: p.body, takenAt: p.takenAt, day: dayKey(p.takenAt),
-      lat: l.lat ?? null, lng: l.lng ?? null, placeName: l.placeName ?? null, comment, voiceNote,
+      lat: l.lat ?? null, lng: l.lng ?? null, placeName: l.placeName ?? null, comment, voiceNote, isPublic,
     })
     if (p.url) URL.revokeObjectURL(p.url)
     setPending(null)
     setMode('camera')
     bump()
-    setToast(`Saved · ${todayCount + 1} of ${max} today`)
+    setToast(`Saved ${isPublic ? 'public' : 'private'} · ${todayCount + 1} of ${max} today`)
   }
 
   function discard() {
@@ -296,6 +297,7 @@ export default function Today() {
 function Review({ pending, onSave, onDiscard }) {
   const [comment, setComment] = useState('')
   const [voiceNote, setVoiceNote] = useState(null)
+  const [isPublic, setIsPublic] = useState(defaultPublic(pending.type))
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
 
@@ -303,7 +305,7 @@ function Review({ pending, onSave, onDiscard }) {
     setBusy(true)
     setErr(null)
     try {
-      await onSave({ comment: comment.trim(), voiceNote })
+      await onSave({ comment: comment.trim(), voiceNote, isPublic })
     } catch (e) {
       setErr(e.message)
       setBusy(false)
@@ -325,6 +327,7 @@ function Review({ pending, onSave, onDiscard }) {
         <MetaOverlay at={pending.takenAt} place={pending.loc?.placeName} lat={pending.loc?.lat} lng={pending.loc?.lng} />
       </div>
       <div className="review-panel">
+        <PrivacySwitch value={isPublic} onChange={setIsPublic} />
         <input className="comment-input" value={comment} onChange={(e) => setComment(e.target.value)} placeholder={pending.type === 'photo' || pending.type === 'video' ? 'Add a comment (optional)' : 'Add a title or note (optional)'} maxLength={280} />
         {pending.type !== 'audio' && <VoiceRecorder value={voiceNote} onChange={setVoiceNote} />}
         {err && <p className="note err">{err}</p>}

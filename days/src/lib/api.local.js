@@ -18,6 +18,7 @@ async function blobUrl(key) {
 async function hydrate(c) {
   return {
     ...c,
+    is_public: c.is_public ?? (c.type === 'photo' || c.type === 'video'),
     media_url: await blobUrl(c.media_key),
     thumb_url: await blobUrl(c.thumb_key),
     voice_note_url: await blobUrl(c.voice_key),
@@ -84,7 +85,7 @@ export function createLocalApi() {
       },
     },
     captures: {
-      async create({ file, thumb, type, takenAt, day, lat, lng, placeName, comment, voiceNote, body }) {
+      async create({ file, thumb, type, takenAt, day, lat, lng, placeName, comment, voiceNote, body, isPublic }) {
         const me = await idb.get('kv', 'profile')
         const today = await idb.rangeByDay(day, day)
         if (today.filter((c) => !c.imported).length >= (me.daily_max || 10)) throw new Error('You have reached today’s limit.')
@@ -94,7 +95,7 @@ export function createLocalApi() {
         if (voiceNote) await idb.put('blobs', voiceNote, `${id}:voice`)
         const row = {
           id, user_id: me.id, type, day, taken_at: takenAt.toISOString(),
-          latitude: lat, longitude: lng, place_name: placeName, comment: comment || null, body: body || null, imported: false,
+          latitude: lat, longitude: lng, place_name: placeName, comment: comment || null, body: body || null, is_public: isPublic ?? (type === 'photo' || type === 'video'), imported: false,
           media_key: file ? `${id}:media` : null, thumb_key: thumb ? `${id}:thumb` : null, voice_key: voiceNote ? `${id}:voice` : null,
           created_at: new Date().toISOString(),
         }
