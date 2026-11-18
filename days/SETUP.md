@@ -59,7 +59,7 @@ In both cases, the "redirect URL" they ask for is shown on that Supabase page; c
 | The app | `days/` folder in this repository |
 | Database setup | `days/supabase/schema.sql` |
 | Hosting settings | `netlify.toml` (repository root) or `days/vercel.json` if you prefer Vercel |
-| Daily min / max | Settings screen in the app (defaults 1 and 10) |
+| Daily minimum for a streak | Settings screen in the app (default 1) |
 | Which capture shows first in a day | `START_AT` at the top of `days/src/screens/DayView.jsx` (currently first of the day) |
 
 **Using Vercel instead of Netlify:** import the repository at vercel.com, set **Root Directory** to `days`, add the same two environment variables, and deploy.

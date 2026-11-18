@@ -33,8 +33,6 @@ export default function Today() {
   const [mode, setMode] = useState('camera') // camera | voice | note
   const [sp, setSp] = useSearchParams()
   const voiceRef = useRef()
-  const max = profile.daily_max || 10
-  const full = todayCount >= max
 
   // The pen and mic buttons on other screens open this screen with ?new=note or ?new=voice
   useEffect(() => {
@@ -47,7 +45,6 @@ export default function Today() {
 
   function openMode(m) {
     if (pending) return
-    if (m !== 'camera' && full) return setToast(`That’s today done: ${max} of ${max}. See you tomorrow!`)
     setMode(m)
   }
 
@@ -171,7 +168,6 @@ export default function Today() {
     onPointerDown(e) {
       if (mode === 'voice') return voiceRef.current?.stop()
       if (mode === 'note') return setMode('camera')
-      if (full) return setToast(`That’s today done: ${max} of ${max}. See you tomorrow!`)
       if (camError) return fileRef.current.click()
       e.currentTarget.setPointerCapture?.(e.pointerId)
       const p = press.current
@@ -220,7 +216,7 @@ export default function Today() {
     setPending(null)
     setMode('camera')
     bump()
-    setToast(`Saved ${isPublic ? 'public' : 'private'} · ${todayCount + 1} of ${max} today`)
+    setToast(`Saved ${isPublic ? 'public' : 'private'} · ${todayCount + 1} today`)
   }
 
   function discard() {
@@ -234,7 +230,7 @@ export default function Today() {
   const recording = recSecs !== null
   const shutter = (
     <button
-      className={`shutter ${recording || mode === 'voice' ? 'rec' : ''} ${full && mode === 'camera' ? 'done' : ''}`}
+      className={`shutter ${recording || mode === 'voice' ? 'rec' : ''}`}
       aria-label={mode === 'voice' ? 'Finish voice note' : mode === 'note' ? 'Back to camera' : 'Tap for photo, hold for video'}
       disabled={!!pending}
       {...shutterHandlers}
@@ -277,7 +273,7 @@ export default function Today() {
           )}
           {flash && <div className="flash" />}
           <div className="vf-top">
-            <span className={`count-chip ${full ? 'full' : ''}`}>{todayCount}/{max} today</span>
+            <span className="count-chip">{todayCount} today</span>
             {recording ? (
               <span className="rec-chip">● {recSecs}s</span>
             ) : (
@@ -285,7 +281,7 @@ export default function Today() {
             )}
           </div>
           <MetaOverlay at={now} place={loc.placeName} lat={loc.lat} lng={loc.lng}>
-            {!recording && !camError && <div className="hint">{full ? 'Today is full' : 'Tap for photo · hold for video'}</div>}
+            {!recording && !camError && <div className="hint">Tap for photo · hold for video</div>}
           </MetaOverlay>
         </div>
       )}

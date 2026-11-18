@@ -47,7 +47,7 @@ export function createLocalApi() {
         const base = (name || 'me').toLowerCase().replace(/[^a-z0-9]/g, '') || 'me'
         const profile = existing || {
           id: crypto.randomUUID(), email, name, username: base, avatar_url: null,
-          theme: 'stone', daily_min: 1, daily_max: 10, created_at: new Date().toISOString(),
+          theme: 'stone', daily_min: 1, created_at: new Date().toISOString(),
         }
         await idb.put('kv', profile, 'profile')
         localStorage.setItem(SESSION, '1')
@@ -87,8 +87,6 @@ export function createLocalApi() {
     captures: {
       async create({ file, thumb, type, takenAt, day, lat, lng, placeName, comment, voiceNote, body, isPublic }) {
         const me = await idb.get('kv', 'profile')
-        const today = await idb.rangeByDay(day, day)
-        if (today.filter((c) => !c.imported).length >= (me.daily_max || 10)) throw new Error('You have reached today’s limit.')
         const id = crypto.randomUUID()
         if (file) await idb.put('blobs', file, `${id}:media`)
         if (thumb) await idb.put('blobs', thumb, `${id}:thumb`)

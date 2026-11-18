@@ -81,7 +81,7 @@ export function createSupabaseApi(url, key) {
         const res = await sb.from('captures').insert(row).select().single()
         if (res.error) {
           await sb.storage.from(BUCKET).remove([media_url, thumb_url, voice_note_url].map(pathOf).filter(Boolean))
-          throw new Error(res.error.message.includes('Daily limit') ? 'You have reached today’s limit.' : res.error.message)
+          throw new Error(res.error.message)
         }
         return res.data
       },

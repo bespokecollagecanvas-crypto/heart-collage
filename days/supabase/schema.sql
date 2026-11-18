@@ -12,7 +12,6 @@ create table if not exists public.profiles (
   avatar_url  text,
   theme       text not null default 'stone' check (theme in ('stone', 'graphite')),
   daily_min   int  not null default 1  check (daily_min >= 0),
-  daily_max   int  not null default 10 check (daily_max between 1 and 50),
   created_at  timestamptz not null default now()
 );
 
@@ -66,23 +65,9 @@ alter table public.profiles add constraint profiles_theme_check check (theme in 
 
 create index if not exists captures_user_day on public.captures (user_id, day, taken_at);
 
--- Enforce the daily maximum (imported photos don't count).
-create or replace function public.enforce_daily_max() returns trigger
-language plpgsql security definer set search_path = public as $$
-declare maxn int; n int;
-begin
-  if new.imported then return new; end if;
-  select daily_max into maxn from profiles where id = new.user_id;
-  select count(*) into n from captures where user_id = new.user_id and day = new.day and not imported;
-  if n >= coalesce(maxn, 10) then
-    raise exception 'Daily limit reached';
-  end if;
-  return new;
-end $$;
-
+-- No daily maximum: remove the old limit if an earlier version added it.
 drop trigger if exists captures_daily_max on public.captures;
-create trigger captures_daily_max before insert on public.captures
-  for each row execute function public.enforce_daily_max();
+drop function if exists public.enforce_daily_max();
 
 -- ---------- Tags and follows ----------
 create table if not exists public.tags (

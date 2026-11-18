@@ -162,7 +162,7 @@ function FannedStack({ captures, index, setIndex, onOpen, mine }) {
 
   const n = captures.length
   // Cards never move: each keeps its place in the day. Swiping or tapping
-  // only changes which card is picked; that one slides out to be seen.
+  // only swaps which card is in front.
   const pick = (i) => setIndex(Math.max(0, Math.min(n - 1, i)))
 
   const handlers = {
@@ -204,7 +204,6 @@ function FannedStack({ captures, index, setIndex, onOpen, mine }) {
         captures.map((c, i) => {
           const p = slots[i]
           const on = i === index
-          const out = on && n > 1 ? 14 * (p.left ? -1 : 1) : 0
           return (
             <div
               key={c.id}
@@ -212,7 +211,7 @@ function FannedStack({ captures, index, setIndex, onOpen, mine }) {
               className={`card ${on ? 'front picked' : ''} type-${c.type}`}
               style={{
                 width: p.cardW, height: p.cardH,
-                transform: `translate(${p.x + out}px, ${p.y - (on && n > 1 ? 6 : 0)}px) scale(${on && n > 1 ? Math.min(1.06, p.scale + 0.1) : p.scale})`,
+                transform: `translate(${p.x}px, ${p.y}px) scale(${p.scale})`,
                 transformOrigin: p.left ? 'left top' : 'right top',
                 zIndex: on ? 150 : 100 - i,
                 '--shade': on ? 0 : Math.min(i, 6) * 0.05,

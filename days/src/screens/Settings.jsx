@@ -46,14 +46,10 @@ export default function Settings() {
           ))}
         </div>
 
-        <h3>Daily rules</h3>
+        <h3>Daily habit</h3>
         <div className="rule">
           <div><strong>Minimum</strong><span>Captures that count a day as logged</span></div>
-          <div className="stepper"><button onClick={() => step('daily_min', -1, 1, profile.daily_max)}>−</button><b>{profile.daily_min}</b><button onClick={() => step('daily_min', 1, 1, profile.daily_max)}>+</button></div>
-        </div>
-        <div className="rule">
-          <div><strong>Maximum</strong><span>So every photo counts</span></div>
-          <div className="stepper"><button onClick={() => step('daily_max', -1, Math.max(1, profile.daily_min), 50)}>−</button><b>{profile.daily_max}</b><button onClick={() => step('daily_max', 1, 1, 50)}>+</button></div>
+          <div className="stepper"><button onClick={() => step('daily_min', -1, 1, 50)}>−</button><b>{profile.daily_min}</b><button onClick={() => step('daily_min', 1, 1, 50)}>+</button></div>
         </div>
         <p className="note">Current streak: {streak} {streak === 1 ? 'day' : 'days'} in a row.</p>
 
