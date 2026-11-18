@@ -452,3 +452,29 @@ video.mirror { transform: scaleX(-1); }
 .day-foot .day-hint { margin: 0; text-align: left; }
 .card.picked { box-shadow: 0 0 0 1.5px var(--accent), var(--card-shadow); }
 .card, .card::after { cursor: pointer; }
+
+/* Notes are always white cards with black text, in both themes */
+.face-text { background: #ffffff; color: #111111; }
+.face-text p { -webkit-line-clamp: unset; display: block; }
+.face-text.short p { font-size: 15px; line-height: 1.35; }
+.face-text.mid p { font-size: 12px; }
+.face-text.long p { font-size: 9.5px; line-height: 1.35; }
+.face-text.xlong p { font-size: 7.5px; line-height: 1.3; }
+.face-text.compact p { color: #555; }
+.full.type-text, .review-media.text { background: #ffffff; color: #111111; }
+.full.type-text .meta-overlay, .review-media.text .meta-overlay { color: #111111; background: linear-gradient(transparent, #ffffff 45%); }
+.full.type-text .count-chip, .full.type-text .icon-btn.glass { background: #eeeeee; color: #111111; }
+.full.type-text .dots span { background: #cccccc; } .full.type-text .dots span.on { background: #111111; }
+
+/* Cleared cards drop away; their time tab stays faint */
+.card { transition: transform var(--dur) var(--ease), opacity 0.35s ease; }
+.card.gone { opacity: 0; pointer-events: none; }
+.time-tab.gone { opacity: 0.35; }
+.time-tab.gone .line { background: transparent; border-top: 1px dashed var(--ink); }
+.stack-empty { position: absolute; left: 0; right: 0; top: 45%; text-align: center; margin: 0; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.face-text.fit p, .face-text.fit strong { font-size: 1em; line-height: 1.35; }
+.face-text.fit strong { font-weight: 600; }
+.card.type-text::after { opacity: 0; }
+.card.type-text { box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08), var(--card-shadow); }
+.review-media .face-text.fit { padding: 24px 22px 170px; }
+.face-text.fit p, .face-text.fit strong { overflow: visible; flex: none; }

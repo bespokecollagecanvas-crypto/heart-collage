@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from 'react'
 import { Camera, Mic, Scribble, TextNote, Video } from './icons'
 
 const ICONS = { photo: Camera, video: Video, audio: Mic, drawing: Scribble, text: TextNote }
@@ -23,18 +24,43 @@ export default function CaptureFace({ c, live = false, compact = false }) {
     const src = live ? c.media_url : c.thumb_url || c.media_url
     return <img className={`face-media ${c.type === 'drawing' ? 'drawing' : ''}`} src={src} alt="" draggable={false} loading="lazy" />
   }
-  if (c.type === 'text')
-    return (
-      <div className={`face face-text ${compact ? 'compact' : ''}`}>
-        {c.comment && !compact && <strong>{c.comment}</strong>}
-        <p>{c.body}</p>
-      </div>
-    )
+  if (c.type === 'text') return <NoteFace c={c} compact={compact} />
   return (
     <div className={`face face-audio ${compact ? 'compact' : ''}`}>
       <Mic size={compact ? 16 : 34} strokeWidth={1.5} />
       {c.comment && !compact && <strong>{c.comment}</strong>}
       {!compact && <span className="face-kicker">Voice note</span>}
+    </div>
+  )
+}
+
+/** A white note card that shrinks its text until the whole note fits. */
+function NoteFace({ c, compact }) {
+  const box = useRef()
+  useLayoutEffect(() => {
+    const el = box.current
+    if (!el || compact) return
+    let size = 16
+    el.style.fontSize = size + 'px'
+    while (size > 5 && el.scrollHeight > el.clientHeight + 1) {
+      size -= 0.5
+      el.style.fontSize = size + 'px'
+    }
+    const ro = new ResizeObserver(() => {
+      let s2 = 16
+      el.style.fontSize = s2 + 'px'
+      while (s2 > 5 && el.scrollHeight > el.clientHeight + 1) {
+        s2 -= 0.5
+        el.style.fontSize = s2 + 'px'
+      }
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [c.body, c.comment, compact])
+  return (
+    <div ref={box} className={`face face-text ${compact ? 'compact' : 'fit'}`}>
+      {c.comment && !compact && <strong>{c.comment}</strong>}
+      <p>{c.body}</p>
     </div>
   )
 }

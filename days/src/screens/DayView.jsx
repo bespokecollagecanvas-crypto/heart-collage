@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import Shell from '../components/Shell'
 import MetaOverlay from '../components/MetaOverlay'
@@ -16,6 +16,23 @@ import { usePinch, useSwipe } from '../lib/gestures'
 // 'first' = the day reads from morning onwards. Change to 'last' to start from the most recent.
 const START_AT = 'first'
 
+// A comment on a photo, video or drawing also gets its own white note card,
+// placed right after the capture it belongs to.
+const VISUAL = new Set(['photo', 'video', 'drawing'])
+function withNoteCards(list) {
+  const out = []
+  for (const c of list) {
+    out.push(c)
+    if (c.comment && VISUAL.has(c.type))
+      out.push({
+        id: `${c.id}:note`, type: 'text', body: c.comment, taken_at: c.taken_at, day: c.day,
+        place_name: c.place_name, latitude: c.latitude, longitude: c.longitude,
+        is_public: c.is_public, user_id: c.user_id, virtual: true,
+      })
+  }
+  return out
+}
+
 export default function DayView() {
   const { username, day } = useParams()
   const nav = useNavigate()
@@ -25,15 +42,18 @@ export default function DayView() {
   const { captures, loading } = useCaptures(person?.id, day, day)
   const [index, setIndex] = useState(0)
   const [expanded, setExpanded] = useState(false)
+  const [dismissed, setDismissed] = useState([])
+  const items = useMemo(() => withNoteCards(captures), [captures])
   const full = sp.get('full') === '1'
   const stageRef = useRef()
   const month = day.slice(0, 7)
 
   useEffect(() => {
     const want = Number(sp.get('i'))
-    setIndex(Number.isFinite(want) && sp.has('i') ? want : START_AT === 'last' ? Math.max(0, captures.length - 1) : 0)
+    setIndex(Number.isFinite(want) && sp.has('i') ? want : START_AT === 'last' ? Math.max(0, items.length - 1) : 0)
     setExpanded(false)
-  }, [day, captures.length])
+    setDismissed([])
+  }, [day, items.length])
 
   usePinch(stageRef, { onPinchIn: () => (full ? setFull(false) : nav(`/u/${username}/m/${month}`)) })
 
@@ -101,16 +121,16 @@ export default function DayView() {
             {mine && isToday && <button className="btn primary" onClick={() => nav('/')}>Capture something</button>}
           </div>
         ) : full ? (
-          <FullView captures={captures} index={index} setIndex={setIndex} onClose={() => setFull(false)} onDelete={mine ? remove : null} onPrivacy={mine ? togglePrivacy : null} />
+          <FullView captures={items} index={Math.min(index, items.length - 1)} setIndex={setIndex} onClose={() => setFull(false)} onDelete={mine ? remove : null} onPrivacy={mine ? togglePrivacy : null} />
         ) : expanded ? (
-          <Spread captures={captures} index={index} onPick={(i) => { setIndex(i); setExpanded(false) }} />
+          <Spread captures={items} index={index} onPick={(i) => { setIndex(i); setDismissed((d) => d.filter((x) => x !== items[i].id)); setExpanded(false) }} />
         ) : (
-          <FannedStack captures={captures} index={index} setIndex={setIndex} onOpen={() => setFull(true)} mine={mine} />
+          <FannedStack captures={items} index={index} setIndex={setIndex} onOpen={() => setFull(true)} mine={mine} dismissed={dismissed} setDismissed={setDismissed} />
         )}
 
         {!full && captures.length > 0 && (
           <div className="day-foot">
-            <p className="day-hint">{expanded ? 'Tap one to pick it' : 'Swipe or tap · double tap to open'}</p>
+            <p className="day-hint">{expanded ? 'Tap one to pick it' : 'Swipe sideways to pick · down to clear · up to bring back'}</p>
             <button className="btn small ghost" onClick={() => setExpanded(!expanded)}>{expanded ? 'Stack' : 'Spread'}</button>
           </div>
         )}
@@ -148,26 +168,50 @@ function stackLayout(n, w, h) {
   })
 }
 
-function FannedStack({ captures, index, setIndex, onOpen, mine }) {
+function FannedStack({ captures, index, setIndex, onOpen, mine, dismissed, setDismissed }) {
   const ref = useRef()
   const [size, setSize] = useState(null)
-  const g = useRef({ x: 0, y: 0, active: false, lastTap: 0, lastCard: -1, timer: null })
+  const g = useRef({ x: 0, y: 0, active: false, target: null, lastTap: 0, lastCard: -1 })
 
   useLayoutEffect(() => {
     const ro = new ResizeObserver(([e]) => setSize({ w: e.contentRect.width, h: e.contentRect.height }))
     ro.observe(ref.current)
     return () => ro.disconnect()
   }, [])
-  useEffect(() => () => clearTimeout(g.current.timer), [])
 
   const n = captures.length
-  // Cards never move: each keeps its place in the day. Swiping or tapping
-  // only swaps which card is in front.
-  const pick = (i) => setIndex(Math.max(0, Math.min(n - 1, i)))
+  const gone = new Set(dismissed)
+  const isGone = (i) => gone.has(captures[i]?.id)
+  // Cards never move. Sideways swipes or taps swap which card is in front;
+  // a downward swipe clears a card away; an upward swipe brings the last one back.
+
+  function step(d) {
+    let j = index + d
+    while (j >= 0 && j < n && isGone(j)) j += d
+    if (j >= 0 && j < n) setIndex(j)
+  }
+  function dismiss(i) {
+    if (isGone(i)) return
+    const left = new Set([...dismissed, captures[i].id])
+    setDismissed([...dismissed, captures[i].id])
+    let j = captures.findIndex((c, k) => k > i && !left.has(c.id))
+    if (j < 0) j = captures.findLastIndex((c, k) => k < i && !left.has(c.id))
+    if (j >= 0) setIndex(j)
+  }
+  function restore(i) {
+    const id = i == null ? dismissed[dismissed.length - 1] : captures[i].id
+    if (!id) return
+    setDismissed(dismissed.filter((x) => x !== id))
+    setIndex(captures.findIndex((c) => c.id === id))
+  }
 
   const handlers = {
     onPointerDown(e) {
-      g.current = { ...g.current, x: e.clientX, y: e.clientY, active: true }
+      const card = e.target.closest?.('.card[data-i]')
+      const hit = e.target.closest?.('[data-i]')
+      // Keep following this finger even if it leaves the stack mid-swipe.
+      e.currentTarget.setPointerCapture?.(e.pointerId)
+      g.current = { ...g.current, x: e.clientX, y: e.clientY, active: true, target: card ? Number(card.dataset.i) : null, hit: hit ? Number(hit.dataset.i) : null }
     },
     onPointerUp(e) {
       const s = g.current
@@ -175,20 +219,21 @@ function FannedStack({ captures, index, setIndex, onOpen, mine }) {
       s.active = false
       const dx = e.clientX - s.x
       const dy = e.clientY - s.y
-      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) return pick(index + (dx < 0 ? 1 : -1))
+      if (Math.abs(dy) > 40 && Math.abs(dy) > Math.abs(dx)) return dy > 0 ? dismiss(s.target ?? index) : restore()
+      if (Math.abs(dx) > 40) return step(dx < 0 ? 1 : -1)
       if (Math.hypot(dx, dy) > 10) return
-      const el = e.target.closest?.('[data-i]')
-      if (!el) return
-      const i = Number(el.dataset.i)
+      const i = s.hit
+      if (i == null) return
+      if (isGone(i)) return restore(i)
       const t = Date.now()
       if (t - s.lastTap < 320 && s.lastCard === i) {
         s.lastTap = 0
-        pick(i)
+        setIndex(i)
         onOpen()
       } else {
         s.lastTap = t
         s.lastCard = i
-        pick(i)
+        setIndex(i)
       }
     },
     onPointerCancel() {
@@ -197,28 +242,30 @@ function FannedStack({ captures, index, setIndex, onOpen, mine }) {
   }
 
   const slots = size ? stackLayout(n, size.w, size.h) : null
+  const allGone = n > 0 && dismissed.length >= n
 
   return (
     <div className="stack" ref={ref} {...handlers}>
       {slots &&
         captures.map((c, i) => {
           const p = slots[i]
-          const on = i === index
+          const on = i === index && !isGone(i)
+          const out = isGone(i)
           return (
             <div
               key={c.id}
               data-i={i}
-              className={`card ${on ? 'front picked' : ''} type-${c.type}`}
+              className={`card ${on ? 'front picked' : ''} ${out ? 'gone' : ''} type-${c.type}`}
               style={{
                 width: p.cardW, height: p.cardH,
-                transform: `translate(${p.x}px, ${p.y}px) scale(${p.scale})`,
+                transform: `translate(${p.x}px, ${p.y + (out ? 80 : 0)}px) scale(${p.scale})`,
                 transformOrigin: p.left ? 'left top' : 'right top',
                 zIndex: on ? 150 : 100 - i,
                 '--shade': on ? 0 : Math.min(i, 6) * 0.05,
               }}
             >
               <CaptureFace c={c} live={on} />
-              {mine && !c.is_public && <span className="lock-badge" aria-label="Private"><Lock size={11} /></span>}
+              {mine && !c.is_public && !c.virtual && <span className="lock-badge" aria-label="Private"><Lock size={11} /></span>}
               {c.voice_note_url && c.type !== 'audio' && <span className="card-badge"><TypeIcon type="audio" size={12} /></span>}
             </div>
           )
@@ -234,15 +281,16 @@ function FannedStack({ captures, index, setIndex, onOpen, mine }) {
             <button
               key={`t${c.id}`}
               data-i={i}
-              className={`time-tab ${p.left ? 'l' : 'r'} ${i === index ? 'on' : ''}`}
+              className={`time-tab ${p.left ? 'l' : 'r'} ${i === index && !isGone(i) ? 'on' : ''} ${isGone(i) ? 'gone' : ''}`}
               style={{ ...style, zIndex: 200 }}
-              aria-label={`${clock(new Date(c.taken_at))}, show this one`}
+              aria-label={`${clock(new Date(c.taken_at))}, ${isGone(i) ? 'bring back' : 'show this one'}`}
             >
               <span className="pill"><TypeIcon type={c.type} size={13} />{clock(new Date(c.taken_at))}</span>
               <span className="line" />
             </button>
           )
         })}
+      {allGone && <p className="stack-empty">All cleared · swipe up to bring them back</p>}
     </div>
   )
 }
@@ -303,10 +351,10 @@ function FullView({ captures, index, setIndex, onClose, onDelete, onPrivacy }) {
       <div className="full-top">
         <div className="row">
           <span className="count-chip"><TypeIcon type={c.type} size={12} /> {index + 1} / {n}</span>
-          {onPrivacy && <PrivacyChip isPublic={!!c.is_public} onToggle={() => onPrivacy(c)} />}
+          {onPrivacy && !c.virtual && <PrivacyChip isPublic={!!c.is_public} onToggle={() => onPrivacy(c)} />}
         </div>
         <div className="row">
-          {onDelete && (
+          {onDelete && !c.virtual && (
             <button className={`icon-btn glass ${armed ? 'armed' : ''}`} onClick={(e) => { e.stopPropagation(); armed ? onDelete(c) : setArmed(true) }} aria-label={armed ? 'Tap again to delete' : 'Delete'}>
               {armed ? <span className="armed-label">Delete?</span> : <Trash />}
             </button>
