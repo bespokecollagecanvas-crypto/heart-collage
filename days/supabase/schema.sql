@@ -10,7 +10,7 @@ create table if not exists public.profiles (
   name        text not null default '',
   username    text unique not null,
   avatar_url  text,
-  theme       text not null default 'playful' check (theme in ('playful', 'chic')),
+  theme       text not null default 'stone' check (theme in ('stone', 'graphite')),
   daily_min   int  not null default 1  check (daily_min >= 0),
   daily_max   int  not null default 10 check (daily_max between 1 and 50),
   created_at  timestamptz not null default now()
@@ -39,8 +39,9 @@ create trigger on_auth_user_created after insert on auth.users
 create table if not exists public.captures (
   id              uuid primary key default gen_random_uuid(),
   user_id         uuid not null references public.profiles on delete cascade,
-  type            text not null check (type in ('photo', 'video', 'audio', 'text')),
-  media_url       text,
+  type            text not null check (type in ('photo', 'video', 'audio', 'text', 'drawing')),
+  media_url       text,             -- photo, video, voice recording or drawing image
+  body            text,             -- the words of a text note
   thumb_url       text,
   taken_at        timestamptz not null,
   day             date not null,           -- the calendar day on the phone that took it
@@ -52,6 +53,15 @@ create table if not exists public.captures (
   imported        boolean not null default false,
   created_at      timestamptz not null default now()
 );
+-- Keeps older copies of this table up to date when the file is run again.
+alter table public.captures add column if not exists body text;
+alter table public.captures drop constraint if exists captures_type_check;
+alter table public.captures add constraint captures_type_check check (type in ('photo', 'video', 'audio', 'text', 'drawing'));
+alter table public.profiles drop constraint if exists profiles_theme_check;
+update public.profiles set theme = case when theme = 'chic' then 'graphite' else 'stone' end where theme not in ('stone', 'graphite');
+alter table public.profiles alter column theme set default 'stone';
+alter table public.profiles add constraint profiles_theme_check check (theme in ('stone', 'graphite'));
+
 create index if not exists captures_user_day on public.captures (user_id, day, taken_at);
 
 -- Enforce the daily maximum (imported photos don't count).

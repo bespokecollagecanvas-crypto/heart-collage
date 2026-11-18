@@ -1,15 +1,15 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useApp } from '../lib/store'
 import { dayKey } from '../lib/dates'
-import { People, Stack } from './icons'
+import { Mic, Pen, People, Stack } from './icons'
 import Avatar from './Avatar'
 
 /**
  * Every screen sits between two permanent bars:
- *  top: [left] [profile button, dead centre] [right]
- *  bottom: [today's stack] [capture button, centre] [people]
+ *  top:    [left]            [profile button, dead centre]   [right]
+ *  bottom: [pen] [mic]       [capture button, centre]        [today's stack] [people]
  */
-export default function Shell({ left, right, onCentre, centreLabel = 'Zoom out', centrePerson, shutter, children, stageClass = '' }) {
+export default function Shell({ left, right, onCentre, centreLabel = 'Zoom out', centrePerson, shutter, onPen, onMic, active, children, stageClass = '' }) {
   const { profile, toast } = useApp()
   const nav = useNavigate()
   const me = profile?.username
@@ -24,19 +24,25 @@ export default function Shell({ left, right, onCentre, centreLabel = 'Zoom out',
       </header>
       <main className={`stage ${stageClass}`}>{children}</main>
       <footer className="bar bottom">
-        <div className="slot left">
-          <Link className="icon-btn" to={`/u/${me}/d/${dayKey()}`} aria-label="Today's stack">
-            <Stack />
-          </Link>
+        <div className="slot left tools">
+          <button className={`tool ${active === 'note' ? 'on' : ''}`} onClick={onPen || (() => nav('/?new=note'))} aria-label="Write or draw a note">
+            <Pen size={20} />
+          </button>
+          <button className={`tool ${active === 'voice' ? 'on' : ''}`} onClick={onMic || (() => nav('/?new=voice'))} aria-label="Record a voice note">
+            <Mic size={20} />
+          </button>
         </div>
         {shutter || (
-          <button className="shutter" onClick={() => nav('/')} aria-label="Capture">
+          <button className="shutter" onClick={() => nav('/')} aria-label="Camera">
             <span />
           </button>
         )}
-        <div className="slot right">
-          <Link className="icon-btn" to="/people" aria-label="People">
-            <People />
+        <div className="slot right tools">
+          <Link className="tool" to={`/u/${me}/d/${dayKey()}`} aria-label="Today's stack">
+            <Stack size={20} />
+          </Link>
+          <Link className="tool" to="/people" aria-label="People">
+            <People size={20} />
           </Link>
         </div>
       </footer>

@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Shell from '../components/Shell'
 import MetaOverlay from '../components/MetaOverlay'
-import { VoiceRecorder } from '../components/Voice'
+import { VoicePlayer, VoiceRecorder } from '../components/Voice'
+import NoteComposer from '../components/NoteComposer'
+import VoiceCapture from '../components/VoiceCapture'
+import CaptureFace from '../components/CaptureFace'
 import { Flame, Flip, Gear, Image } from '../components/icons'
 import { useApp } from '../lib/store'
 import { api } from '../lib/api'
@@ -26,8 +29,26 @@ export default function Today() {
   const [recSecs, setRecSecs] = useState(null)
   const [pending, setPending] = useState(null)
   const [flash, setFlash] = useState(false)
+  const [mode, setMode] = useState('camera') // camera | voice | note
+  const [sp, setSp] = useSearchParams()
+  const voiceRef = useRef()
   const max = profile.daily_max || 10
   const full = todayCount >= max
+
+  // The pen and mic buttons on other screens open this screen with ?new=note or ?new=voice
+  useEffect(() => {
+    const want = sp.get('new')
+    if (want === 'note' || want === 'voice') {
+      openMode(want)
+      setSp({}, { replace: true })
+    }
+  }, [sp])
+
+  function openMode(m) {
+    if (pending) return
+    if (m !== 'camera' && full) return setToast(`That’s today done: ${max} of ${max}. See you tomorrow!`)
+    setMode(m)
+  }
 
   // Live clock and location for the overlay
   useEffect(() => {
@@ -47,7 +68,7 @@ export default function Today() {
 
   // Camera on while this screen is showing (paused during review)
   useEffect(() => {
-    if (pending) return
+    if (pending || mode !== 'camera') return
     let cancelled = false
     const stop = () => {
       streamRef.current?.getTracks().forEach((t) => t.stop())
@@ -79,7 +100,7 @@ export default function Today() {
       document.removeEventListener('visibilitychange', vis)
       stop()
     }
-  }, [facing, pending])
+  }, [facing, pending, mode])
 
   // ---- capture ----
   const press = useRef({ down: false, timer: null, state: 'idle', stopAsked: false, recorder: null, auto: null })
@@ -147,6 +168,8 @@ export default function Today() {
 
   const shutterHandlers = {
     onPointerDown(e) {
+      if (mode === 'voice') return voiceRef.current?.stop()
+      if (mode === 'note') return setMode('camera')
       if (full) return setToast(`That’s today done: ${max} of ${max}. See you tomorrow!`)
       if (camError) return fileRef.current.click()
       e.currentTarget.setPointerCapture?.(e.pointerId)
@@ -158,6 +181,7 @@ export default function Today() {
       }, HOLD_MS)
     },
     onPointerUp() {
+      if (mode !== 'camera') return
       const p = press.current
       if (!p.down) return
       p.down = false
@@ -188,25 +212,29 @@ export default function Today() {
     const p = pending
     const l = p.loc?.lat ? p.loc : loc
     await api.captures.create({
-      file: p.file, thumb: p.thumb, type: p.type, takenAt: p.takenAt, day: dayKey(p.takenAt),
+      file: p.file, thumb: p.thumb, type: p.type, body: p.body, takenAt: p.takenAt, day: dayKey(p.takenAt),
       lat: l.lat ?? null, lng: l.lng ?? null, placeName: l.placeName ?? null, comment, voiceNote,
     })
-    URL.revokeObjectURL(p.url)
+    if (p.url) URL.revokeObjectURL(p.url)
     setPending(null)
+    setMode('camera')
     bump()
     setToast(`Saved · ${todayCount + 1} of ${max} today`)
   }
 
   function discard() {
-    URL.revokeObjectURL(pending.url)
+    if (pending.url) URL.revokeObjectURL(pending.url)
     setPending(null)
+    setMode('camera')
   }
+
+  const fromComposer = (p) => setPending({ ...p, takenAt: new Date(), loc })
 
   const recording = recSecs !== null
   const shutter = (
     <button
-      className={`shutter ${recording ? 'rec' : ''} ${full ? 'done' : ''}`}
-      aria-label="Tap for photo, hold for video"
+      className={`shutter ${recording || mode === 'voice' ? 'rec' : ''} ${full && mode === 'camera' ? 'done' : ''}`}
+      aria-label={mode === 'voice' ? 'Finish voice note' : mode === 'note' ? 'Back to camera' : 'Tap for photo, hold for video'}
       disabled={!!pending}
       {...shutterHandlers}
     >
@@ -226,10 +254,17 @@ export default function Today() {
       onCentre={() => nav(`/u/${profile.username}/m/${dayKey().slice(0, 7)}`)}
       centreLabel="My calendar"
       shutter={shutter}
-      stageClass="camera-stage"
+      onPen={() => (mode === 'note' ? setMode('camera') : openMode('note'))}
+      onMic={() => (mode === 'voice' ? voiceRef.current?.stop() : openMode('voice'))}
+      active={pending ? null : mode}
+      stageClass={mode === 'camera' && !pending ? 'camera-stage' : ''}
     >
       {pending ? (
         <Review pending={pending} onSave={save} onDiscard={discard} />
+      ) : mode === 'note' ? (
+        <NoteComposer onDone={fromComposer} onCancel={() => setMode('camera')} />
+      ) : mode === 'voice' ? (
+        <VoiceCapture ref={voiceRef} onDone={fromComposer} onCancel={() => setMode('camera')} />
       ) : (
         <div className="viewfinder">
           <video ref={videoRef} playsInline muted autoPlay className={facing === 'user' ? 'mirror' : ''} />
@@ -248,7 +283,7 @@ export default function Today() {
               !camError && <button className="icon-btn glass" onClick={() => setFacing(facing === 'user' ? 'environment' : 'user')} aria-label="Flip camera"><Flip /></button>
             )}
           </div>
-          <MetaOverlay at={now} place={loc.placeName}>
+          <MetaOverlay at={now} place={loc.placeName} lat={loc.lat} lng={loc.lng}>
             {!recording && !camError && <div className="hint">{full ? 'Today is full' : 'Tap for photo · hold for video'}</div>}
           </MetaOverlay>
         </div>
@@ -277,20 +312,24 @@ function Review({ pending, onSave, onDiscard }) {
 
   return (
     <div className="review">
-      <div className="review-media">
+      <div className={`review-media ${pending.type}`}>
         {pending.type === 'video' ? (
           <video src={pending.url} playsInline autoPlay loop muted={false} controls={false} />
+        ) : pending.type === 'audio' ? (
+          <div className="face face-audio big"><VoicePlayer src={pending.url} label="Play back" /></div>
+        ) : pending.type === 'text' ? (
+          <CaptureFace c={{ type: 'text', body: pending.body }} />
         ) : (
           <img src={pending.url} alt="" />
         )}
-        <MetaOverlay at={pending.takenAt} place={pending.loc?.placeName} />
+        <MetaOverlay at={pending.takenAt} place={pending.loc?.placeName} lat={pending.loc?.lat} lng={pending.loc?.lng} />
       </div>
       <div className="review-panel">
-        <input className="comment-input" value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Add a comment (optional)" maxLength={280} />
-        <VoiceRecorder value={voiceNote} onChange={setVoiceNote} />
+        <input className="comment-input" value={comment} onChange={(e) => setComment(e.target.value)} placeholder={pending.type === 'photo' || pending.type === 'video' ? 'Add a comment (optional)' : 'Add a title or note (optional)'} maxLength={280} />
+        {pending.type !== 'audio' && <VoiceRecorder value={voiceNote} onChange={setVoiceNote} />}
         {err && <p className="note err">{err}</p>}
         <div className="review-actions">
-          <button className="btn ghost" onClick={onDiscard} disabled={busy}>Retake</button>
+          <button className="btn ghost" onClick={onDiscard} disabled={busy}>{pending.type === 'photo' || pending.type === 'video' ? 'Retake' : 'Discard'}</button>
           <button className="btn primary" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Keep it'}</button>
         </div>
       </div>

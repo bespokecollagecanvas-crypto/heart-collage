@@ -20,3 +20,9 @@ export const Check = (p) => <S {...p}><path d="M20 6L9 17l-5-5" /></S>
 export const Search = (p) => <S {...p}><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></S>
 export const Expand = (p) => <S {...p}><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></S>
 export const Image = (p) => <S {...p}><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></S>
+export const Pen = (p) => <S {...p}><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></S>
+export const Camera = (p) => <S {...p}><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></S>
+export const Video = (p) => <S {...p}><path d="M23 7l-7 5 7 5V7z" /><rect x="1" y="5" width="15" height="14" rx="2" /></S>
+export const TextNote = (p) => <S {...p}><path d="M4 6h16M4 12h16M4 18h10" /></S>
+export const Scribble = (p) => <S {...p}><path d="M3 17c3-6 5-9 7-9s-1 8 2 8 3-6 5-6 1 5 4 5" /></S>
+export const Undo = (p) => <S {...p}><path d="M9 14L4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 0 10h-3" /></S>

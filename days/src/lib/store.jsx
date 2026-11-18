@@ -43,11 +43,12 @@ export function AppProvider({ children }) {
       .catch(() => {})
   }, [profile?.id, version])
 
-  const theme = profile?.theme || localStorage.getItem('days-theme') || 'playful'
+  const raw = profile?.theme || localStorage.getItem('days-theme') || 'stone'
+  const theme = raw === 'chic' || raw === 'graphite' ? 'graphite' : 'stone'
   useEffect(() => {
     document.documentElement.dataset.theme = theme
     localStorage.setItem('days-theme', theme)
-    document.querySelector('meta[name=theme-color]')?.setAttribute('content', theme === 'chic' ? '#1b1a19' : '#ffffff')
+    document.querySelector('meta[name=theme-color]')?.setAttribute('content', theme === 'graphite' ? '#121212' : '#e9e8e4')
   }, [theme])
 
   useEffect(() => {

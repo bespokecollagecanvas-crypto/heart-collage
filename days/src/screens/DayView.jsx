@@ -3,10 +3,11 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import Shell from '../components/Shell'
 import MetaOverlay from '../components/MetaOverlay'
 import { VoicePlayer } from '../components/Voice'
+import CaptureFace, { TypeIcon } from '../components/CaptureFace'
 import { Back, Close, Next, Trash } from '../components/icons'
 import { useApp, useCaptures, useProfile } from '../lib/store'
 import { api } from '../lib/api'
-import { addDays, clock, dayFraction, dayKey, longDate } from '../lib/dates'
+import { addDays, clock, dayKey, longDate } from '../lib/dates'
 import { usePinch, useSwipe } from '../lib/gestures'
 
 // Open question in the brief: which capture sits at the front when a day opens.
@@ -72,7 +73,7 @@ export default function DayView() {
               <h2>{isToday ? 'Today' : longDate(day)}</h2>
               <p>
                 {isToday && <>{longDate(day)} · </>}
-                {captures.length ? `${captures.length} ${captures.length === 1 ? 'moment' : 'moments'}` : ''}
+                {captures.length ? `${captures.length} ${captures.length === 1 ? 'entry' : 'entries'}` : ''}
                 {places.length ? ` · ${places.slice(0, 2).join(', ')}` : ''}
               </p>
             </div>
@@ -96,31 +97,54 @@ export default function DayView() {
         )}
 
         {!full && captures.length > 0 && (
-          <p className="day-hint">{expanded ? 'Tap a moment to bring it to the front' : 'Swipe through · tap to spread · double tap for full screen'}</p>
+          <p className="day-hint">{expanded ? 'Tap a moment to bring it to the front' : 'Swipe · tap to spread · double tap to open'}</p>
         )}
       </div>
     </Shell>
   )
 }
 
-/* ---------- The fanned stack ---------- */
+/* ---------- The stack ----------
+   Front card sits bottom left. Each card behind climbs the screen,
+   alternating right, left, right… and tucking further in and getting
+   slightly smaller, so the pile reads in perspective. With few cards
+   they spread out (two cards: the second sits high up); with more,
+   they close up. */
 
-const STEP_X = 7
-const STEP_Y = 10
-const TAB_W = 62
-const MAX_DEPTH = 6
+const TAB = 88 // room either side for the time tabs
+const PAD = 12
+
+function stackLayout(n, w, h) {
+  const availW = w - TAB * 2
+  const cardW = Math.max(96, Math.min(availW * 0.86, (h - PAD * 2) * 0.32))
+  const cardH = cardW * (4 / 3)
+  const slack = Math.max(0, availW - cardW)
+  const vstep = n > 1 ? Math.min((h - PAD * 2 - cardH) / (n - 1), cardH * 0.9) : 0
+  const tower = cardH + vstep * (n - 1)
+  const bottom = h - PAD - Math.max(0, (h - PAD * 2 - tower) / 2)
+  const inset = n > 1 ? (slack * 0.45) / (n - 1) : 0
+  const strip = n > 1 ? Math.min(vstep, cardH) : cardH
+  return Array.from({ length: n }, (_, d) => {
+    const left = d % 2 === 0
+    const scale = Math.max(0.74, 1 - d * 0.04)
+    const x = left ? TAB + d * inset : TAB + slack - d * inset
+    const y = bottom - cardH - d * vstep
+    return { d, left, x, y, scale, cardW, cardH, tabY: y + Math.max(4, (strip * scale) / 2 - 12) }
+  })
+}
 
 function FannedStack({ captures, index, setIndex, onTap, onDoubleTap }) {
   const ref = useRef()
   const [size, setSize] = useState(null)
   const [drag, setDrag] = useState(0)
-  const g = useRef({ x: 0, y: 0, active: false, moved: false, lastTap: 0, timer: null })
+  const g = useRef({ x: 0, active: false, moved: false, lastTap: 0, timer: null })
 
   useLayoutEffect(() => {
     const ro = new ResizeObserver(([e]) => setSize({ w: e.contentRect.width, h: e.contentRect.height }))
     ro.observe(ref.current)
     return () => ro.disconnect()
   }, [])
+  useEffect(() => () => clearTimeout(g.current.timer), [])
 
   const n = captures.length
   const depthOf = (i) => (i - index + n) % n
@@ -128,7 +152,7 @@ function FannedStack({ captures, index, setIndex, onTap, onDoubleTap }) {
 
   const handlers = {
     onPointerDown(e) {
-      g.current = { ...g.current, x: e.clientX, y: e.clientY, active: true, moved: false }
+      g.current = { ...g.current, x: e.clientX, active: true, moved: false }
     },
     onPointerMove(e) {
       if (!g.current.active) return
@@ -143,7 +167,7 @@ function FannedStack({ captures, index, setIndex, onTap, onDoubleTap }) {
       const dx = e.clientX - s.x
       setDrag(0)
       if (s.moved) {
-        if (Math.abs(dx) > 60 && n > 1) go(dx < 0 ? 1 : -1)
+        if (Math.abs(dx) > 50 && n > 1) go(dx < 0 ? 1 : -1)
         return
       }
       const t = Date.now()
@@ -161,84 +185,56 @@ function FannedStack({ captures, index, setIndex, onTap, onDoubleTap }) {
       setDrag(0)
     },
   }
-  useEffect(() => () => clearTimeout(g.current.timer), [])
 
-  let layout = null
-  if (size) {
-    const depthMax = Math.min(n - 1, MAX_DEPTH)
-    const cardW = Math.max(120, Math.min(size.w - TAB_W - 20 - depthMax * STEP_X, (size.h - 20 - depthMax * STEP_Y) * 0.75))
-    const cardH = cardW * (4 / 3)
-    const left = Math.max(6, (size.w - TAB_W - cardW - depthMax * STEP_X) / 2)
-    const top = (size.h - cardH + depthMax * STEP_Y) / 2
-    // Each tab sits at the height of its time of day, nudged apart so none overlap.
-    const pad = 16
-    const GAP = 25
-    const items = captures
-      .map((c, i) => ({ i, y: top + pad + dayFraction(new Date(c.taken_at)) * (cardH - pad * 2) }))
-      .sort((a, b) => a.y - b.y)
-    for (let k = 1; k < items.length; k++) items[k].y = Math.max(items[k].y, items[k - 1].y + GAP)
-    const maxY = size.h - 14
-    for (let k = items.length - 1; k >= 0; k--) {
-      const limit = k === items.length - 1 ? maxY : items[k + 1].y - GAP
-      items[k].y = Math.min(items[k].y, limit)
-    }
-    const tabY = {}
-    items.forEach((it) => (tabY[it.i] = it.y))
-    layout = { cardW, cardH, left, top, tabY }
-  }
+  const slots = size ? stackLayout(n, size.w, size.h) : null
 
   return (
     <div className="stack" ref={ref} {...handlers}>
-      {layout &&
+      {slots &&
         captures.map((c, i) => {
-          const d = depthOf(i)
-          const hidden = d > MAX_DEPTH
-          const front = d === 0
-          const x = layout.left + Math.min(d, MAX_DEPTH) * STEP_X + (front ? drag : 0)
-          const y = layout.top - Math.min(d, MAX_DEPTH) * STEP_Y
-          const rot = front ? drag / 25 : (d % 2 ? 1.2 : -0.8) * Math.min(d, 3) * 0.6
+          const p = slots[depthOf(i)]
+          const front = p.d === 0
           return (
             <div
               key={c.id}
-              className={`card ${front ? 'front' : ''} ${front && drag ? 'dragging' : ''}`}
+              className={`card ${front ? 'front' : ''} ${front && drag ? 'dragging' : ''} type-${c.type}`}
               style={{
-                width: layout.cardW, height: layout.cardH,
-                transform: `translate(${x}px, ${y}px) rotate(${rot}deg)`,
-                zIndex: 100 - d, opacity: hidden ? 0 : 1,
-                '--shade': Math.min(d, MAX_DEPTH) * 0.07,
+                width: p.cardW, height: p.cardH,
+                transform: `translate(${p.x + (front ? drag : 0)}px, ${p.y}px) scale(${p.scale}) rotate(${front ? drag / 30 : 0}deg)`,
+                transformOrigin: p.left ? 'left top' : 'right top',
+                zIndex: 100 - p.d,
+                '--shade': Math.min(p.d, 6) * 0.06,
               }}
             >
-              <CardMedia c={c} live={front} />
-              {front && <div className="card-place">{c.place_name}</div>}
+              <CaptureFace c={c} live={front} />
+              {c.voice_note_url && c.type !== 'audio' && <span className="card-badge"><TypeIcon type="audio" size={12} /></span>}
             </div>
           )
         })}
-      {layout &&
+      {slots &&
         captures.map((c, i) => {
-          const d = Math.min(depthOf(i), MAX_DEPTH)
-          const lineFrom = layout.left + layout.cardW + d * STEP_X
+          const p = slots[depthOf(i)]
+          const right = p.left ? null : p.x + p.cardW
+          const style = p.left
+            ? { left: 4, width: p.x - 2, top: p.tabY }
+            : { left: right - 2, width: size.w - right - 2, top: p.tabY }
           return (
             <button
               key={`t${c.id}`}
-              className={`time-tab ${i === index ? 'on' : ''}`}
-              style={{ left: lineFrom - 2, top: layout.tabY[i] - 11, zIndex: 200 }}
+              className={`time-tab ${p.left ? 'l' : 'r'} ${i === index ? 'on' : ''}`}
+              style={{ ...style, zIndex: 200 }}
               onPointerDown={(e) => e.stopPropagation()}
               onPointerUp={(e) => e.stopPropagation()}
               onClick={() => setIndex(i)}
+              aria-label={`${clock(new Date(c.taken_at))}, bring to front`}
             >
+              <span className="pill"><TypeIcon type={c.type} size={13} />{clock(new Date(c.taken_at))}</span>
               <span className="line" />
-              <span className="pill">{clock(new Date(c.taken_at))}</span>
             </button>
           )
         })}
     </div>
   )
-}
-
-function CardMedia({ c, live }) {
-  if (c.type === 'video' && live)
-    return <video src={c.media_url} poster={c.thumb_url || undefined} autoPlay muted loop playsInline />
-  return <img src={live ? c.media_url : c.thumb_url || c.media_url} alt="" draggable={false} loading="lazy" />
 }
 
 /* ---------- Tap: spread the whole day out ---------- */
@@ -247,10 +243,9 @@ function Spread({ captures, index, onPick }) {
   return (
     <div className="spread">
       {captures.map((c, i) => (
-        <button key={c.id} className={`spread-item ${i === index ? 'on' : ''}`} style={{ '--i': i }} onClick={() => onPick(i)}>
-          <img src={c.thumb_url || c.media_url} alt="" />
-          <span className="pill">{clock(new Date(c.taken_at))}</span>
-          {c.type === 'video' && <span className="badge">▶</span>}
+        <button key={c.id} className={`spread-item type-${c.type} ${i === index ? 'on' : ''}`} style={{ '--i': i }} onClick={() => onPick(i)}>
+          <CaptureFace c={c} />
+          <span className="pill"><TypeIcon type={c.type} size={11} />{clock(new Date(c.taken_at))}</span>
         </button>
       ))}
     </div>
@@ -278,16 +273,24 @@ function FullView({ captures, index, setIndex, onClose, onDelete }) {
     if (t - last.current < 300) onClose()
     last.current = t
   }
+  const visual = c.type === 'photo' || c.type === 'video' || c.type === 'drawing'
   return (
-    <div className="full" {...swipe} onClick={tap}>
-      <div className="full-bg" style={{ backgroundImage: `url(${c.thumb_url || c.media_url})` }} />
+    <div className={`full type-${c.type} ${visual ? 'visual' : 'paper-bg'}`} {...swipe} onClick={tap}>
+      {visual && c.type !== 'drawing' && <div className="full-bg" style={{ backgroundImage: `url(${c.thumb_url || c.media_url})` }} />}
       {c.type === 'video' ? (
         <video key={c.id} className="full-media" src={c.media_url} autoPlay loop playsInline controls />
-      ) : (
+      ) : visual ? (
         <img key={c.id} className="full-media" src={c.media_url} alt="" />
+      ) : c.type === 'text' ? (
+        <div key={c.id} className="full-text"><p>{c.body}</p></div>
+      ) : (
+        <div key={c.id} className="full-audio" onClick={(e) => e.stopPropagation()}>
+          <TypeIcon type="audio" size={44} strokeWidth={1.25} />
+          <VoicePlayer src={c.media_url} label="Play voice note" />
+        </div>
       )}
       <div className="full-top">
-        <span className="count-chip">{index + 1} / {n}</span>
+        <span className="count-chip"><TypeIcon type={c.type} size={12} /> {index + 1} / {n}</span>
         <div className="row">
           {onDelete && (
             <button className={`icon-btn glass ${armed ? 'armed' : ''}`} onClick={(e) => { e.stopPropagation(); armed ? onDelete(c) : setArmed(true) }} aria-label={armed ? 'Tap again to delete' : 'Delete'}>
@@ -297,7 +300,7 @@ function FullView({ captures, index, setIndex, onClose, onDelete }) {
           <button className="icon-btn glass" onClick={(e) => { e.stopPropagation(); onClose() }} aria-label="Close"><Close /></button>
         </div>
       </div>
-      <MetaOverlay at={c.taken_at} place={c.place_name}>
+      <MetaOverlay at={c.taken_at} place={c.place_name} lat={c.latitude} lng={c.longitude}>
         {c.comment && <p className="meta-comment">{c.comment}</p>}
         {c.voice_note_url && <VoicePlayer src={c.voice_note_url} />}
       </MetaOverlay>

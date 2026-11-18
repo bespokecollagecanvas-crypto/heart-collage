@@ -6,7 +6,7 @@ import { useApp } from '../lib/store'
 import { api } from '../lib/api'
 
 export default function Settings() {
-  const { profile, updateProfile, streak, setToast } = useApp()
+  const { profile, updateProfile, streak, setToast, theme } = useApp()
   const nav = useNavigate()
   const [name, setName] = useState(profile.name)
   const [username, setUsername] = useState(profile.username)
@@ -34,14 +34,14 @@ export default function Settings() {
         <h3>Look</h3>
         <div className="themes">
           {[
-            ['playful', 'Playful', 'Bold, bright and bouncy'],
-            ['chic', 'Chic', 'Dark, warm and elegant'],
+            ['stone', 'Stone', 'Light plaster and graphite'],
+            ['graphite', 'Graphite', 'Dark, matte and quiet'],
           ].map(([id, label, sub]) => (
-            <button key={id} className={`theme-card ${id} ${profile.theme === id ? 'on' : ''}`} onClick={() => updateProfile({ theme: id })}>
+            <button key={id} className={`theme-card ${id} ${theme === id ? 'on' : ''}`} onClick={() => updateProfile({ theme: id })}>
               <span className="swatches"><i /><i /><i /></span>
               <strong>{label}</strong>
               <span>{sub}</span>
-              {profile.theme === id && <Check className="tick" size={18} />}
+              {theme === id && <Check className="tick" size={18} />}
             </button>
           ))}
         </div>

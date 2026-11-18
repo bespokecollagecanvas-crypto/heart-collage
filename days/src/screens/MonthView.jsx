@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Shell from '../components/Shell'
 import PersonHeader from '../components/PersonHeader'
+import CaptureFace from '../components/CaptureFace'
 import { Back, Flame, Gear, Next } from '../components/icons'
 import { useApp, useCaptures, useProfile } from '../lib/store'
 import { MONTHS, WEEKDAY_INITIALS, dayKey, monthGrid, monthRange, parseMonth, shiftMonth } from '../lib/dates'
@@ -56,10 +57,10 @@ export default function MonthView() {
             if (!k) return <span key={i} className="cell blank" />
             const list = byDay[k]
             const top = list?.[0]
-            const cls = ['cell', k === today && 'today', k > today && 'future', top && 'has'].filter(Boolean).join(' ')
+            const cls = ['cell', k === today && 'today', k > today && 'future', top && 'has', top && `type-${top.type}`].filter(Boolean).join(' ')
             return (
               <Link key={k} to={`/u/${username}/d/${k}`} className={cls} style={{ '--n': i }}>
-                {top && <img src={top.thumb_url || top.media_url} alt="" loading="lazy" />}
+                {top && <CaptureFace c={top} compact />}
                 <span className="num">{Number(k.slice(8))}</span>
                 {list?.length > 1 && <span className="more">{list.length}</span>}
               </Link>

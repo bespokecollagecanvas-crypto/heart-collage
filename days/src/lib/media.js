@@ -13,6 +13,7 @@ export function extFor(mime = '') {
   if (mime.includes('mp4')) return 'mp4'
   if (mime.includes('webm')) return 'webm'
   if (mime.includes('png')) return 'png'
+  if (mime.includes('mpeg')) return 'mp3'
   if (mime.includes('quicktime')) return 'mov'
   return 'jpg'
 }

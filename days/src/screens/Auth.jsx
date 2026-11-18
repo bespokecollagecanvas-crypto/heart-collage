@@ -41,7 +41,7 @@ export default function Auth() {
         <h1 className="wordmark big">Days</h1>
         <p className="tagline">Never forget a day.</p>
         <div className="hero-grid" aria-hidden="true">
-          {Array.from({ length: 21 }, (_, i) => <span key={i} className={`hg c${(i * 7) % 5}`} />)}
+          {Array.from({ length: 28 }, (_, i) => <span key={i} className={`hg ${[2, 3, 5, 8, 9, 10, 12, 15, 16, 17, 19, 22, 23].includes(i) ? 'on' : ''} ${i === 24 ? 'today' : ''}`} />)}
         </div>
       </div>
 

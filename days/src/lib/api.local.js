@@ -46,7 +46,7 @@ export function createLocalApi() {
         const base = (name || 'me').toLowerCase().replace(/[^a-z0-9]/g, '') || 'me'
         const profile = existing || {
           id: crypto.randomUUID(), email, name, username: base, avatar_url: null,
-          theme: 'playful', daily_min: 1, daily_max: 10, created_at: new Date().toISOString(),
+          theme: 'stone', daily_min: 1, daily_max: 10, created_at: new Date().toISOString(),
         }
         await idb.put('kv', profile, 'profile')
         localStorage.setItem(SESSION, '1')
@@ -84,18 +84,18 @@ export function createLocalApi() {
       },
     },
     captures: {
-      async create({ file, thumb, type, takenAt, day, lat, lng, placeName, comment, voiceNote }) {
+      async create({ file, thumb, type, takenAt, day, lat, lng, placeName, comment, voiceNote, body }) {
         const me = await idb.get('kv', 'profile')
         const today = await idb.rangeByDay(day, day)
         if (today.filter((c) => !c.imported).length >= (me.daily_max || 10)) throw new Error('You have reached today’s limit.')
         const id = crypto.randomUUID()
-        await idb.put('blobs', file, `${id}:media`)
+        if (file) await idb.put('blobs', file, `${id}:media`)
         if (thumb) await idb.put('blobs', thumb, `${id}:thumb`)
         if (voiceNote) await idb.put('blobs', voiceNote, `${id}:voice`)
         const row = {
           id, user_id: me.id, type, day, taken_at: takenAt.toISOString(),
-          latitude: lat, longitude: lng, place_name: placeName, comment: comment || null, imported: false,
-          media_key: `${id}:media`, thumb_key: thumb ? `${id}:thumb` : null, voice_key: voiceNote ? `${id}:voice` : null,
+          latitude: lat, longitude: lng, place_name: placeName, comment: comment || null, body: body || null, imported: false,
+          media_key: file ? `${id}:media` : null, thumb_key: thumb ? `${id}:thumb` : null, voice_key: voiceNote ? `${id}:voice` : null,
           created_at: new Date().toISOString(),
         }
         await idb.put('captures', row)
