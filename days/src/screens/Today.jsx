@@ -33,6 +33,13 @@ export default function Today() {
   const [mode, setMode] = useState('camera') // camera | voice | note
   const [sp, setSp] = useSearchParams()
   const voiceRef = useRef()
+  const noteRef = useRef()
+
+  // While writing or drawing, the red button (and the pen) mean Done.
+  function finishNote() {
+    if (noteRef.current?.ready) noteRef.current.done()
+    else setMode('camera')
+  }
 
   // The pen and mic buttons on other screens open this screen with ?new=note or ?new=voice
   useEffect(() => {
@@ -167,7 +174,7 @@ export default function Today() {
   const shutterHandlers = {
     onPointerDown(e) {
       if (mode === 'voice') return voiceRef.current?.stop()
-      if (mode === 'note') return setMode('camera')
+      if (mode === 'note') return finishNote()
       if (camError) return fileRef.current.click()
       e.currentTarget.setPointerCapture?.(e.pointerId)
       const p = press.current
@@ -231,7 +238,7 @@ export default function Today() {
   const shutter = (
     <button
       className={`shutter ${recording || mode === 'voice' ? 'rec' : ''}`}
-      aria-label={mode === 'voice' ? 'Finish voice note' : mode === 'note' ? 'Back to camera' : 'Tap for photo, hold for video'}
+      aria-label={mode === 'voice' ? 'Finish voice note' : mode === 'note' ? 'Save note' : 'Tap for photo, hold for video'}
       disabled={!!pending}
       {...shutterHandlers}
     >
@@ -251,15 +258,15 @@ export default function Today() {
       onCentre={() => nav(`/u/${profile.username}/m/${dayKey().slice(0, 7)}`)}
       centreLabel="My calendar"
       shutter={shutter}
-      onPen={() => (mode === 'note' ? setMode('camera') : openMode('note'))}
-      onMic={() => (mode === 'voice' ? voiceRef.current?.stop() : openMode('voice'))}
+      onPen={() => (mode === 'note' ? finishNote() : openMode('note'))}
+      onMic={() => (mode === 'voice' ? voiceRef.current?.stop() : mode === 'note' && noteRef.current?.ready ? setToast('Tap the red button to save your note first') : openMode('voice'))}
       active={pending ? null : mode}
       stageClass={mode === 'camera' && !pending ? 'camera-stage' : ''}
     >
       {pending ? (
         <Review pending={pending} onSave={save} onDiscard={discard} />
       ) : mode === 'note' ? (
-        <NoteComposer onDone={fromComposer} onCancel={() => setMode('camera')} />
+        <NoteComposer ref={noteRef} onDone={fromComposer} onCancel={() => setMode('camera')} />
       ) : mode === 'voice' ? (
         <VoiceCapture ref={voiceRef} onDone={fromComposer} onCancel={() => setMode('camera')} />
       ) : (

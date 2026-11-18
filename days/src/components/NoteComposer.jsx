@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react'
 import { makeThumb } from '../lib/media'
 import { Close, Undo } from './icons'
 
@@ -8,9 +8,26 @@ const css = (name) => getComputedStyle(document.documentElement).getPropertyValu
  * A blank page. Tap it to type (or paste) a note.
  * Start moving a finger across it and it becomes a drawing, and stays one.
  */
-export default function NoteComposer({ onDone, onCancel }) {
-  const [mode, setMode] = useState(null) // null = undecided, 'text' or 'drawing'
-  const [text, setText] = useState('')
+const DRAFT = 'days-note-draft'
+const readDraft = () => {
+  try {
+    return localStorage.getItem(DRAFT) || ''
+  } catch {
+    return ''
+  }
+}
+const writeDraft = (t) => {
+  try {
+    if (t) localStorage.setItem(DRAFT, t)
+    else localStorage.removeItem(DRAFT)
+  } catch {
+    /* drafts are a convenience only */
+  }
+}
+
+const NoteComposer = forwardRef(function NoteComposer({ onDone, onCancel }, ref) {
+  const [text, setText] = useState(readDraft)
+  const [mode, setMode] = useState(() => (readDraft() ? 'text' : null)) // null = undecided, 'text' or 'drawing'
   const [strokes, setStrokes] = useState([])
   const surface = useRef()
   const canvas = useRef()
@@ -59,6 +76,8 @@ export default function NoteComposer({ onDone, onCancel }) {
     return () => ro.disconnect()
   }, [])
   useEffect(() => redraw(), [strokes])
+  // Typed text is kept as a draft until it is saved, so it is never lost.
+  useEffect(() => writeDraft(mode === 'text' ? text : ''), [text, mode])
   useEffect(() => {
     if (mode === 'text') textarea.current?.focus()
   }, [mode])
@@ -115,7 +134,10 @@ export default function NoteComposer({ onDone, onCancel }) {
   }
 
   async function done() {
-    if (mode === 'text') return onDone({ type: 'text', body: text.trim() })
+    if (mode === 'text') {
+      writeDraft('')
+      return onDone({ type: 'text', body: text.trim() })
+    }
     const c = canvas.current
     const out = document.createElement('canvas')
     out.width = c.width
@@ -130,13 +152,14 @@ export default function NoteComposer({ onDone, onCancel }) {
   }
 
   const ready = (mode === 'text' && text.trim()) || (mode === 'drawing' && strokes.length)
+  useImperativeHandle(ref, () => ({ done, ready: !!ready }), [ready, mode, text, strokes])
   const hint =
-    mode === 'drawing' ? 'Drawing' : mode === 'text' ? 'Note' : 'Tap to type · drag to draw'
+    mode === 'drawing' ? 'Drawing · red button saves' : mode === 'text' ? 'Note · red button saves' : 'Tap to type · drag to draw'
 
   return (
     <div className="composer">
       <div className="composer-bar">
-        <button className="icon-btn small" onClick={onCancel} aria-label="Cancel"><Close size={20} /></button>
+        <button className="icon-btn small" onClick={onCancel} aria-label="Close (typed text is kept as a draft)"><Close size={20} /></button>
         <span className="eyebrow">{hint}</span>
         <div className="row">
           {mode === 'drawing' && <button className="icon-btn small" onClick={undo} aria-label="Undo"><Undo size={20} /></button>}
@@ -164,4 +187,6 @@ export default function NoteComposer({ onDone, onCancel }) {
       </div>
     </div>
   )
-}
+})
+
+export default NoteComposer
