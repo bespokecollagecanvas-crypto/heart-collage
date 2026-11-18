@@ -47,7 +47,7 @@ export function VoiceRecorder({ value, onChange }) {
       rec.current = r
       setSecs(0)
     } catch {
-      alert('Microphone not available. Check that Days is allowed to use it.')
+      setSecs(null)
     }
   }
   function stop() {

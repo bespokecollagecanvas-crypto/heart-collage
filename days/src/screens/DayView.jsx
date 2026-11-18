@@ -42,7 +42,6 @@ export default function DayView() {
   }
 
   async function remove(c) {
-    if (!confirm('Delete this capture? This can’t be undone.')) return
     try {
       await api.captures.remove(c)
       setIndex(0)
@@ -262,6 +261,12 @@ function Spread({ captures, index, onPick }) {
 
 function FullView({ captures, index, setIndex, onClose, onDelete }) {
   const c = captures[index] || captures[0]
+  const [armed, setArmed] = useState(false)
+  useEffect(() => {
+    if (!armed) return
+    const t = setTimeout(() => setArmed(false), 3000)
+    return () => clearTimeout(t)
+  }, [armed])
   const n = captures.length
   const last = useRef(0)
   const swipe = useSwipe({
@@ -284,7 +289,11 @@ function FullView({ captures, index, setIndex, onClose, onDelete }) {
       <div className="full-top">
         <span className="count-chip">{index + 1} / {n}</span>
         <div className="row">
-          {onDelete && <button className="icon-btn glass" onClick={(e) => { e.stopPropagation(); onDelete(c) }} aria-label="Delete"><Trash /></button>}
+          {onDelete && (
+            <button className={`icon-btn glass ${armed ? 'armed' : ''}`} onClick={(e) => { e.stopPropagation(); armed ? onDelete(c) : setArmed(true) }} aria-label={armed ? 'Tap again to delete' : 'Delete'}>
+              {armed ? <span className="armed-label">Delete?</span> : <Trash />}
+            </button>
+          )}
           <button className="icon-btn glass" onClick={(e) => { e.stopPropagation(); onClose() }} aria-label="Close"><Close /></button>
         </div>
       </div>

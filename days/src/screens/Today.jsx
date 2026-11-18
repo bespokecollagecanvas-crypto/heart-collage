@@ -54,6 +54,7 @@ export default function Today() {
       streamRef.current = null
     }
     async function start() {
+      if (import.meta.env.VITE_PREVIEW === '1') return setCamError('preview')
       if (!navigator.mediaDevices?.getUserMedia) return setCamError('This browser can’t open the camera.')
       stop()
       try {
@@ -234,8 +235,8 @@ export default function Today() {
           <video ref={videoRef} playsInline muted autoPlay className={facing === 'user' ? 'mirror' : ''} />
           {camError && (
             <div className="cam-error">
-              <p>{camError}</p>
-              <button className="btn primary" onClick={() => fileRef.current.click()}><Image size={18} /> Choose a photo</button>
+              <p>{camError === 'preview' ? 'This preview can’t show a live camera. Tap the red button to take a photo or choose one.' : camError}</p>
+              <button className="btn primary" onClick={() => fileRef.current.click()}><Image size={18} /> {camError === 'preview' ? 'Take or choose a photo' : 'Choose a photo'}</button>
             </div>
           )}
           {flash && <div className="flash" />}
@@ -252,7 +253,7 @@ export default function Today() {
           </MetaOverlay>
         </div>
       )}
-      <input ref={fileRef} type="file" accept="image/*,video/*" capture="environment" hidden onChange={onFile} />
+      <input ref={fileRef} type="file" accept="image/*,video/*" hidden onChange={onFile} />
     </Shell>
   )
 }
