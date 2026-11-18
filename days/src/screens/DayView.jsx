@@ -105,11 +105,14 @@ export default function DayView() {
         ) : expanded ? (
           <Spread captures={captures} index={index} onPick={(i) => { setIndex(i); setExpanded(false) }} />
         ) : (
-          <FannedStack captures={captures} index={index} setIndex={setIndex} onTap={() => setExpanded(true)} onDoubleTap={() => setFull(true)} mine={mine} />
+          <FannedStack captures={captures} index={index} setIndex={setIndex} onOpen={() => setFull(true)} mine={mine} />
         )}
 
         {!full && captures.length > 0 && (
-          <p className="day-hint">{expanded ? 'Tap a moment to bring it to the front' : 'Swipe · tap to spread · double tap to open'}</p>
+          <div className="day-foot">
+            <p className="day-hint">{expanded ? 'Tap one to pick it' : 'Swipe or tap · double tap to open'}</p>
+            <button className="btn small ghost" onClick={() => setExpanded(!expanded)}>{expanded ? 'Stack' : 'Spread'}</button>
+          </div>
         )}
       </div>
     </Shell>
@@ -145,11 +148,10 @@ function stackLayout(n, w, h) {
   })
 }
 
-function FannedStack({ captures, index, setIndex, onTap, onDoubleTap, mine }) {
+function FannedStack({ captures, index, setIndex, onOpen, mine }) {
   const ref = useRef()
   const [size, setSize] = useState(null)
-  const [drag, setDrag] = useState(0)
-  const g = useRef({ x: 0, active: false, moved: false, lastTap: 0, timer: null })
+  const g = useRef({ x: 0, y: 0, active: false, lastTap: 0, lastCard: -1, timer: null })
 
   useLayoutEffect(() => {
     const ro = new ResizeObserver(([e]) => setSize({ w: e.contentRect.width, h: e.contentRect.height }))
@@ -159,42 +161,38 @@ function FannedStack({ captures, index, setIndex, onTap, onDoubleTap, mine }) {
   useEffect(() => () => clearTimeout(g.current.timer), [])
 
   const n = captures.length
-  const depthOf = (i) => (i - index + n) % n
-  const go = (d) => setIndex((index + d + n) % n)
+  // Cards never move: each keeps its place in the day. Swiping or tapping
+  // only changes which card is picked; that one slides out to be seen.
+  const pick = (i) => setIndex(Math.max(0, Math.min(n - 1, i)))
 
   const handlers = {
     onPointerDown(e) {
-      g.current = { ...g.current, x: e.clientX, active: true, moved: false }
-    },
-    onPointerMove(e) {
-      if (!g.current.active) return
-      const dx = e.clientX - g.current.x
-      if (Math.abs(dx) > 8) g.current.moved = true
-      if (g.current.moved) setDrag(dx)
+      g.current = { ...g.current, x: e.clientX, y: e.clientY, active: true }
     },
     onPointerUp(e) {
       const s = g.current
       if (!s.active) return
       s.active = false
       const dx = e.clientX - s.x
-      setDrag(0)
-      if (s.moved) {
-        if (Math.abs(dx) > 50 && n > 1) go(dx < 0 ? 1 : -1)
-        return
-      }
+      const dy = e.clientY - s.y
+      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) return pick(index + (dx < 0 ? 1 : -1))
+      if (Math.hypot(dx, dy) > 10) return
+      const el = e.target.closest?.('[data-i]')
+      if (!el) return
+      const i = Number(el.dataset.i)
       const t = Date.now()
-      if (t - s.lastTap < 300) {
-        clearTimeout(s.timer)
+      if (t - s.lastTap < 320 && s.lastCard === i) {
         s.lastTap = 0
-        onDoubleTap()
+        pick(i)
+        onOpen()
       } else {
         s.lastTap = t
-        s.timer = setTimeout(onTap, 300)
+        s.lastCard = i
+        pick(i)
       }
     },
     onPointerCancel() {
       g.current.active = false
-      setDrag(0)
     },
   }
 
@@ -204,21 +202,23 @@ function FannedStack({ captures, index, setIndex, onTap, onDoubleTap, mine }) {
     <div className="stack" ref={ref} {...handlers}>
       {slots &&
         captures.map((c, i) => {
-          const p = slots[depthOf(i)]
-          const front = p.d === 0
+          const p = slots[i]
+          const on = i === index
+          const out = on && n > 1 ? 14 * (p.left ? -1 : 1) : 0
           return (
             <div
               key={c.id}
-              className={`card ${front ? 'front' : ''} ${front && drag ? 'dragging' : ''} type-${c.type}`}
+              data-i={i}
+              className={`card ${on ? 'front picked' : ''} type-${c.type}`}
               style={{
                 width: p.cardW, height: p.cardH,
-                transform: `translate(${p.x + (front ? drag : 0)}px, ${p.y}px) scale(${p.scale}) rotate(${front ? drag / 30 : 0}deg)`,
+                transform: `translate(${p.x + out}px, ${p.y - (on && n > 1 ? 6 : 0)}px) scale(${on && n > 1 ? Math.min(1.06, p.scale + 0.1) : p.scale})`,
                 transformOrigin: p.left ? 'left top' : 'right top',
-                zIndex: 100 - p.d,
-                '--shade': Math.min(p.d, 6) * 0.06,
+                zIndex: on ? 150 : 100 - i,
+                '--shade': on ? 0 : Math.min(i, 6) * 0.05,
               }}
             >
-              <CaptureFace c={c} live={front} />
+              <CaptureFace c={c} live={on} />
               {mine && !c.is_public && <span className="lock-badge" aria-label="Private"><Lock size={11} /></span>}
               {c.voice_note_url && c.type !== 'audio' && <span className="card-badge"><TypeIcon type="audio" size={12} /></span>}
             </div>
@@ -226,7 +226,7 @@ function FannedStack({ captures, index, setIndex, onTap, onDoubleTap, mine }) {
         })}
       {slots &&
         captures.map((c, i) => {
-          const p = slots[depthOf(i)]
+          const p = slots[i]
           const right = p.left ? null : p.x + p.cardW
           const style = p.left
             ? { left: 4, width: p.x - 2, top: p.tabY }
@@ -234,12 +234,10 @@ function FannedStack({ captures, index, setIndex, onTap, onDoubleTap, mine }) {
           return (
             <button
               key={`t${c.id}`}
+              data-i={i}
               className={`time-tab ${p.left ? 'l' : 'r'} ${i === index ? 'on' : ''}`}
               style={{ ...style, zIndex: 200 }}
-              onPointerDown={(e) => e.stopPropagation()}
-              onPointerUp={(e) => e.stopPropagation()}
-              onClick={() => setIndex(i)}
-              aria-label={`${clock(new Date(c.taken_at))}, bring to front`}
+              aria-label={`${clock(new Date(c.taken_at))}, show this one`}
             >
               <span className="pill"><TypeIcon type={c.type} size={13} />{clock(new Date(c.taken_at))}</span>
               <span className="line" />
