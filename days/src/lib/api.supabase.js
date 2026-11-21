@@ -101,6 +101,23 @@ export function createSupabaseApi(url, key) {
         await sb.storage.from(BUCKET).remove([c.media_url, c.thumb_url, c.voice_note_url].map(pathOf).filter(Boolean))
       },
     },
+    days: {
+      async range(userId, from, to) {
+        return check(await sb.from('day_notes').select('*').eq('user_id', userId).gte('day', from).lte('day', to))
+      },
+      async set(day, { highlight, icon, is_public = true }) {
+        const user_id = await uid()
+        if (!highlight && !icon) {
+          check(await sb.from('day_notes').delete().eq('user_id', user_id).eq('day', day))
+          return null
+        }
+        return check(
+          await sb.from('day_notes')
+            .upsert({ user_id, day, highlight: highlight || null, icon: icon || null, is_public, updated_at: new Date().toISOString() })
+            .select().single()
+        )
+      },
+    },
     follows: {
       async follow(id) {
         check(await sb.from('follows').insert({ follower_id: await uid(), following_id: id }))

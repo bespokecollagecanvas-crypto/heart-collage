@@ -7,7 +7,9 @@ import CaptureFace, { TypeIcon } from '../components/CaptureFace'
 import { PrivacyChip } from '../components/Privacy'
 import { Lock } from '../components/icons'
 import { Back, Close, Next, Trash } from '../components/icons'
-import { useApp, useCaptures, useProfile } from '../lib/store'
+import { useApp, useCaptures, useHighlights, useProfile } from '../lib/store'
+import { DayIcon } from '../components/DayIcons'
+import HighlightSheet from '../components/HighlightSheet'
 import { api } from '../lib/api'
 import { addDays, clock, dayKey, longDate } from '../lib/dates'
 import { usePinch, useSwipe } from '../lib/gestures'
@@ -43,6 +45,8 @@ export default function DayView() {
   const [index, setIndex] = useState(0)
   const [expanded, setExpanded] = useState(false)
   const [dismissed, setDismissed] = useState([])
+  const [editing, setEditing] = useState(false)
+  const hl = useHighlights(person?.id, day, day)[day]
   const items = useMemo(() => withNoteCards(captures), [captures])
   const full = sp.get('full') === '1'
   const stageRef = useRef()
@@ -108,6 +112,12 @@ export default function DayView() {
                 {captures.length ? `${captures.length} ${captures.length === 1 ? 'entry' : 'entries'}` : ''}
                 {places.length ? ` · ${places.slice(0, 2).join(', ')}` : ''}
               </p>
+              {(hl || (mine && !future)) && (
+                <button className={`day-highlight ${hl ? '' : 'empty'}`} onClick={() => mine && setEditing(true)} disabled={!mine}>
+                  {hl?.icon && <DayIcon name={hl.icon} size={15} />}
+                  {hl?.highlight ? <span>{hl.highlight}</span> : !hl && <span>+ Add the day’s highlight</span>}
+                </button>
+              )}
             </div>
             <Link className={`icon-btn small ${future ? 'disabled' : ''}`} to={`/u/${username}/d/${addDays(day, 1)}`} replace aria-label="Next day"><Next size={20} /></Link>
           </div>
@@ -135,6 +145,7 @@ export default function DayView() {
           </div>
         )}
       </div>
+      {editing && <HighlightSheet day={day} initial={hl} onClose={() => setEditing(false)} />}
     </Shell>
   )
 }

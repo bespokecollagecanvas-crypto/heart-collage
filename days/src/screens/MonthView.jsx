@@ -1,11 +1,12 @@
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Shell from '../components/Shell'
 import PersonHeader from '../components/PersonHeader'
 import CaptureFace from '../components/CaptureFace'
 import { Back, Flame, Gear, Next } from '../components/icons'
-import { useApp, useCaptures, useProfile } from '../lib/store'
-import { MONTHS, WEEKDAY_INITIALS, dayKey, monthGrid, monthRange, parseMonth, shiftMonth } from '../lib/dates'
+import { useApp, useCaptures, useHighlights, useProfile } from '../lib/store'
+import { DayIcon } from '../components/DayIcons'
+import { MONTHS, WEEKDAY_INITIALS, dayKey, longDate, monthGrid, monthRange, parseMonth, shiftMonth } from '../lib/dates'
 import { usePinch, useSwipe } from '../lib/gestures'
 
 export default function MonthView() {
@@ -16,6 +17,9 @@ export default function MonthView() {
   const { year, month } = parseMonth(ym)
   const { from, to } = monthRange(year, month)
   const { captures } = useCaptures(person?.id, from, to)
+  const highlights = useHighlights(person?.id, from, to)
+  const [selected, setSelected] = useState(null)
+  useEffect(() => setSelected(null), [ym, username])
   const ref = useRef()
   const today = dayKey()
 
@@ -58,15 +62,37 @@ export default function MonthView() {
             const list = byDay[k]
             const top = list?.[0]
             const cls = ['cell', k === today && 'today', k > today && 'future', top && 'has', top && `type-${top.type}`].filter(Boolean).join(' ')
+            const hl = highlights[k]
             return (
-              <Link key={k} to={`/u/${username}/d/${k}`} className={cls} style={{ '--n': i }}>
+              <button
+                key={k}
+                className={`${cls} ${selected === k ? 'selected' : ''}`}
+                style={{ '--n': i }}
+                onClick={() => (selected === k ? nav(`/u/${username}/d/${k}`) : setSelected(k))}
+                aria-label={`${longDate(k)}${hl?.highlight ? `: ${hl.highlight}` : ''}`}
+              >
                 {top && <CaptureFace c={top} compact />}
                 <span className="num">{Number(k.slice(8))}</span>
+                {hl?.icon && <span className="day-icon"><DayIcon name={hl.icon} size={12} /></span>}
                 {list?.length > 1 && <span className="more">{list.length}</span>}
-              </Link>
+              </button>
             )
           })}
         </div>
+        {selected ? (
+          <div className="day-peek" key={selected}>
+            <div className="peek-text">
+              <span className="eyebrow muted">{longDate(selected)}{byDay[selected] ? ` · ${byDay[selected].length} ${byDay[selected].length === 1 ? 'entry' : 'entries'}` : ''}</span>
+              <p>
+                {highlights[selected]?.icon && <DayIcon name={highlights[selected].icon} size={16} />}
+                {highlights[selected]?.highlight || <span className="muted">{byDay[selected] ? 'No highlight yet' : 'Nothing logged'}</span>}
+              </p>
+            </div>
+            <button className="btn small primary" onClick={() => nav(`/u/${username}/d/${selected}`)}>Open</button>
+          </div>
+        ) : (
+          <p className="peek-hint">Tap a day to see its highlight · tap again to open it</p>
+        )}
       </div>
     </Shell>
   )

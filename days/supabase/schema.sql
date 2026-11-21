@@ -12,6 +12,7 @@ create table if not exists public.profiles (
   avatar_url  text,
   theme       text not null default 'stone' check (theme in ('stone', 'graphite')),
   daily_min   int  not null default 1  check (daily_min >= 0),
+  highlight_time text default '09:00',   -- when to ask about yesterday's highlight; null = off
   created_at  timestamptz not null default now()
 );
 
@@ -69,6 +70,19 @@ create index if not exists captures_user_day on public.captures (user_id, day, t
 drop trigger if exists captures_daily_max on public.captures;
 drop function if exists public.enforce_daily_max();
 
+alter table public.profiles add column if not exists highlight_time text default '09:00';
+
+-- ---------- Day highlights: a few words (and an icon) for what made a day ----------
+create table if not exists public.day_notes (
+  user_id     uuid not null references public.profiles on delete cascade,
+  day         date not null,
+  highlight   text,
+  icon        text,
+  is_public   boolean not null default true,
+  updated_at  timestamptz not null default now(),
+  primary key (user_id, day)
+);
+
 -- ---------- Tags and follows ----------
 create table if not exists public.tags (
   capture_id      uuid references public.captures on delete cascade,
@@ -89,6 +103,7 @@ alter table public.profiles enable row level security;
 alter table public.captures enable row level security;
 alter table public.tags     enable row level security;
 alter table public.follows  enable row level security;
+alter table public.day_notes enable row level security;
 
 drop policy if exists "profiles readable" on public.profiles;
 create policy "profiles readable" on public.profiles for select to authenticated using (true);
@@ -112,6 +127,12 @@ drop policy if exists "tag on own captures" on public.tags;
 create policy "tag on own captures" on public.tags for all to authenticated
   using (exists (select 1 from public.captures c where c.id = capture_id and c.user_id = auth.uid()))
   with check (exists (select 1 from public.captures c where c.id = capture_id and c.user_id = auth.uid()));
+
+drop policy if exists "highlights readable" on public.day_notes;
+create policy "highlights readable" on public.day_notes for select to authenticated using (is_public or user_id = auth.uid());
+drop policy if exists "write own highlights" on public.day_notes;
+create policy "write own highlights" on public.day_notes for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 drop policy if exists "follows readable" on public.follows;
 create policy "follows readable" on public.follows for select to authenticated using (true);

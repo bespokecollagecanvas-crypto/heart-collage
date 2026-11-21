@@ -95,6 +95,22 @@ export function useCaptures(userId, from, to) {
   return state
 }
 
+/** Day highlights for a user between two days, as { 'YYYY-MM-DD': {highlight, icon} }. */
+export function useHighlights(userId, from, to) {
+  const { version } = useApp()
+  const [map, setMap] = useState({})
+  useEffect(() => {
+    if (!userId) return
+    let alive = true
+    api.days
+      .range(userId, from, to)
+      .then((rows) => alive && setMap(Object.fromEntries(rows.map((r) => [String(r.day).slice(0, 10), r]))))
+      .catch(() => alive && setMap({}))
+    return () => (alive = false)
+  }, [userId, from, to, version])
+  return map
+}
+
 /** A profile by username (instant for your own). */
 export function useProfile(username) {
   const { profile } = useApp()

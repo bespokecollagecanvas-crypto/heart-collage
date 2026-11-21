@@ -8,6 +8,7 @@ import MonthView from './screens/MonthView'
 import YearView from './screens/YearView'
 import People from './screens/People'
 import Settings from './screens/Settings'
+import HighlightReminder from './components/HighlightReminder'
 
 function ProfileHome() {
   const { username } = useParams()
@@ -19,6 +20,8 @@ export default function App() {
   if (user === undefined || (user && !profile)) return <div className="splash"><span className="wordmark">Days</span></div>
   if (!user) return <Auth />
   return (
+    <>
+    <HighlightReminder />
     <Routes>
       <Route path="/" element={<Today />} />
       <Route path="/u/:username" element={<ProfileHome />} />
@@ -29,5 +32,6 @@ export default function App() {
       <Route path="/settings" element={<Settings />} />
       <Route path="*" element={<Navigate replace to="/" />} />
     </Routes>
+    </>
   )
 }

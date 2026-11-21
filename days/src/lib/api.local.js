@@ -47,7 +47,7 @@ export function createLocalApi() {
         const base = (name || 'me').toLowerCase().replace(/[^a-z0-9]/g, '') || 'me'
         const profile = existing || {
           id: crypto.randomUUID(), email, name, username: base, avatar_url: null,
-          theme: 'stone', daily_min: 1, created_at: new Date().toISOString(),
+          theme: 'stone', daily_min: 1, highlight_time: '09:00', created_at: new Date().toISOString(),
         }
         await idb.put('kv', profile, 'profile')
         localStorage.setItem(SESSION, '1')
@@ -70,7 +70,10 @@ export function createLocalApi() {
       },
     },
     profiles: {
-      me: () => idb.get('kv', 'profile'),
+      async me() {
+        const p = await idb.get('kv', 'profile')
+        return p && p.highlight_time === undefined ? { ...p, highlight_time: '09:00' } : p
+      },
       async update(patch) {
         const p = { ...(await idb.get('kv', 'profile')), ...patch }
         await idb.put('kv', p, 'profile')
@@ -117,6 +120,19 @@ export function createLocalApi() {
       async remove(c) {
         await idb.del('captures', c.id)
         for (const k of [c.media_key, c.thumb_key, c.voice_key]) if (k) await idb.del('blobs', k)
+      },
+    },
+    days: {
+      async range(_userId, from, to) {
+        const all = (await idb.get('kv', 'highlights')) || {}
+        return Object.values(all).filter((d) => d.day >= from && d.day <= to)
+      },
+      async set(day, { highlight, icon, is_public = true }) {
+        const all = (await idb.get('kv', 'highlights')) || {}
+        if (!highlight && !icon) delete all[day]
+        else all[day] = { day, highlight: highlight || null, icon: icon || null, is_public }
+        await idb.put('kv', all, 'highlights')
+        return all[day] || null
       },
     },
     follows: {
